@@ -6,8 +6,14 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniCron.Core", "src\MiniCron.Core\MiniCron.Core.csproj", "{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}"
 EndProject
 Global
-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+ 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
