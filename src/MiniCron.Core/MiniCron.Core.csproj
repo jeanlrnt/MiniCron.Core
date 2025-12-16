@@ -3,7 +3,14 @@
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+        <Nullable>disable</Nullable>
+        <Version>0.0.1</Version>
+        <Authors>jeanlrnt</Authors>
+        <Description>A minimalist Cron task scheduler for .NET Core.</Description>
     </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.1" />
+    </ItemGroup>
 
 </Project>
