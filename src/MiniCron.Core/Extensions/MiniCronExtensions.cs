@@ -14,7 +14,7 @@ public static class MiniCronExtensions
         services.AddLogging();
         
         services.AddSingleton(registry);
-        services.AddHostedService<SchedulerBackgroundService>();
+        services.AddHostedService<MiniCronBackgroundService>();
 
         return services;
     }
