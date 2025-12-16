@@ -35,6 +35,6 @@ public class JobRegistry : IDisposable
 
     public void Dispose()
     {
-        _lock?.Dispose();
+        _lock.Dispose();
     }
 }
