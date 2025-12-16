@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MiniCron.Core.Helpers;
+using System.Collections.Concurrent;
 
 namespace MiniCron.Core.Services;
 
@@ -10,6 +11,7 @@ public class MiniCronBackgroundService : BackgroundService
     private readonly JobRegistry _registry;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<MiniCronBackgroundService> _logger;
+    private readonly ConcurrentDictionary<string, byte> _runningJobs = new();
 
     public MiniCronBackgroundService(
         JobRegistry registry,
@@ -54,9 +56,28 @@ public class MiniCronBackgroundService : BackgroundService
             {
                 if (CronHelper.IsDue(job.CronExpression, now))
                 {
-                    // Run the task in "Fire and Forget" (Task.Run) to avoid blocking
-                    // the scheduler if the task is long.
-                    _ = Task.Run(async () => await ExecuteJobScoped(job, stoppingToken), stoppingToken);
+                    // Check if this job is already running to prevent duplicate executions
+                    if (_runningJobs.TryAdd(job.CronExpression, 0))
+                    {
+                        // Run the task in "Fire and Forget" (Task.Run) to avoid blocking
+                        // the scheduler if the task is long.
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await ExecuteJobScoped(job, stoppingToken);
+                            }
+                            finally
+                            {
+                                // Remove from running jobs when complete
+                                _runningJobs.TryRemove(job.CronExpression, out _);
+                            }
+                        }, stoppingToken);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Job {Cron} is already running, skipping this execution", job.CronExpression);
+                    }
                 }
             }
             catch (Exception ex)
