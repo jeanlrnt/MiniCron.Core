@@ -5,16 +5,16 @@ using MiniCron.Core.Helpers;
 
 namespace MiniCron.Core.Services;
 
-public class SchedulerBackgroundService : BackgroundService
+public class MiniCronBackgroundService : BackgroundService
 {
     private readonly JobRegistry _registry;
     private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<SchedulerBackgroundService> _logger;
+    private readonly ILogger<MiniCronBackgroundService> _logger;
 
-    public SchedulerBackgroundService(
+    public MiniCronBackgroundService(
         JobRegistry registry,
         IServiceProvider serviceProvider,
-        ILogger<SchedulerBackgroundService> logger)
+        ILogger<MiniCronBackgroundService> logger)
     {
         _registry = registry;
         _serviceProvider = serviceProvider;
