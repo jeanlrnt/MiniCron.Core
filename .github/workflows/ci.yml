@@ -28,12 +28,12 @@ jobs:
 
       - name: Test
         run: |
-          dotnet test src/MiniCron.Test/MiniCron.Test.csproj -c Release --no-build --logger "trx;LogFileName=test_results.trx"
+          dotnet test src/MiniCron.Tests/MiniCron.Tests.csproj -c Release --no-build --logger "trx;LogFileName=test_results.trx"
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.os }}
-          path: src/MiniCron.Test/TestResults/*.trx
+          path: src/MiniCron.Tests/TestResults/*.trx
 
