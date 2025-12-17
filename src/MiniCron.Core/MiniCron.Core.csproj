@@ -7,6 +7,10 @@
         <Version>0.0.1</Version>
         <Authors>jeanlrnt</Authors>
         <Description>A minimalist Cron task scheduler for .NET Core.</Description>
+        <PackageTags>cron;scheduler;tasks;minimal-api</PackageTags>
+        <PackageId>MiniCron.Core</PackageId>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <RepositoryUrl>https://github.com/jeanlrnt/MiniCron.Core</RepositoryUrl>
     </PropertyGroup>
 
     <ItemGroup>
