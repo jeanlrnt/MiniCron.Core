@@ -74,6 +74,12 @@ public static class CronHelper
                     $"Invalid step value in {fieldName} field '{field}'. Step must be greater than zero in cron expression: '{fullExpression}'");
             }
 
+            var maxStep = maxValue - minValue + 1;
+            if (step > maxStep)
+            {
+                throw new ArgumentException(
+                    $"Invalid step value in {fieldName} field '{field}'. Step must be less than or equal to {maxStep} for the allowed range {minValue}-{maxValue} in cron expression: '{fullExpression}'");
+            }
             return;
         }
 
