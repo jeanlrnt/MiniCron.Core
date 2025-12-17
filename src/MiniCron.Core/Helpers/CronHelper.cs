@@ -11,7 +11,7 @@ public static class CronHelper
     /// <param name="time">
     /// The DateTime to check against the cron expression.
     /// </param>
-    /// <returns></returns>
+    /// <returns>Returns true if the DateTime matches the cron expression, false otherwise.</returns>
     public static bool IsDue(string cronExpression, DateTime time)
     {
         var parts = cronExpression.Split(' ');
@@ -33,7 +33,7 @@ public static class CronHelper
     /// <param name="value">
     /// The corresponding value from the DateTime to check.
     /// </param>
-    /// <returns></returns>
+    /// <returns>Returns true if the field value matches the cron expression field, false otherwise.</returns>
     private static bool CheckField(string field, int value)
     {
         if (field == "*") return true;
