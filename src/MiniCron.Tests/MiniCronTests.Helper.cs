@@ -1,6 +1,6 @@
 using MiniCron.Core.Helpers;
 
-namespace MiniCron.Test;
+namespace MiniCron.Tests;
 
 public partial class MiniCronTests
 {
