@@ -4,7 +4,7 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <Version>0.0.1</Version>
+        <Version>1.0.0</Version>
         <Authors>jeanlrnt</Authors>
         <Description>A minimalist Cron task scheduler for .NET Core.</Description>
         <PackageTags>cron;scheduler;tasks;minimal-api</PackageTags>
