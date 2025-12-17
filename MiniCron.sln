@@ -5,9 +5,21 @@ MinimumVisualStudioVersion = 10.0.40219.1
 
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniCron.Core", "src\MiniCron.Core\MiniCron.Core.csproj", "{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}"
 EndProject
+ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniCron.Test", "src\MiniCron.Test\MiniCron.Test.csproj", "{70A18CC0-344C-44BD-86A2-4920E31AC2DE}"
+EndProject
 Global
+		GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+		EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-	EndGlobalSection
-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73BF0A05-3DC0-47B8-A0F7-AAD5A0C0B11A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{70A18CC0-344C-44BD-86A2-4920E31AC2DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70A18CC0-344C-44BD-86A2-4920E31AC2DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70A18CC0-344C-44BD-86A2-4920E31AC2DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70A18CC0-344C-44BD-86A2-4920E31AC2DE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
