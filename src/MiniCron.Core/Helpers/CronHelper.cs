@@ -83,12 +83,19 @@ public static class CronHelper
             var values = field.Split(',');
             foreach (var value in values)
             {
-                if (!int.TryParse(value.Trim(), out int intValue))
+                var trimmedValue = value.Trim();
+
+                if (string.IsNullOrEmpty(trimmedValue))
                 {
                     throw new ArgumentException(
-                        $"Invalid list value '{value}' in {fieldName} field. All values must be integers in cron expression: '{fullExpression}'");
+                        $"Empty value in {fieldName} field list is not allowed in cron expression: '{fullExpression}'");
                 }
 
+                if (!int.TryParse(trimmedValue, out int intValue))
+                {
+                    throw new ArgumentException(
+                        $"Invalid list value '{trimmedValue}' in {fieldName} field. All values must be integers in cron expression: '{fullExpression}'");
+                }
                 if (intValue < minValue || intValue > maxValue)
                 {
                     throw new ArgumentException(
