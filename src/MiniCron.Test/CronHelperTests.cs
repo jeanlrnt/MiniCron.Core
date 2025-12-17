@@ -255,4 +255,102 @@ public class CronHelperTests
         // Assert
         Assert.True(result);
     }
+
+    [Fact]
+    public void IsDue_CommaListValidValues_ReturnsTrue()
+    {
+        // Arrange - List of valid minutes "10,20,30"
+        var cronExpression = "10,20,30 * * * *";
+        var time = new DateTime(2024, 1, 1, 12, 20, 0); // minute 20 is in the list
+
+        // Act
+        var result = CronHelper.IsDue(cronExpression, time);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsDue_CommaListValidValues_ReturnsFalse()
+    {
+        // Arrange - List of valid minutes "10,20,30"
+        var cronExpression = "10,20,30 * * * *";
+        var time = new DateTime(2024, 1, 1, 12, 15, 0); // minute 15 is not in the list
+
+        // Act
+        var result = CronHelper.IsDue(cronExpression, time);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsDue_CommaListWithInvalidValue_IgnoresInvalid()
+    {
+        // Arrange - List with one invalid value "10,abc,30"
+        var cronExpression = "10,abc,30 * * * *";
+        var time = new DateTime(2024, 1, 1, 12, 30, 0); // minute 30 is a valid value in the list
+
+        // Act
+        var result = CronHelper.IsDue(cronExpression, time);
+
+        // Assert - Should return true because 30 is valid and matches
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsDue_CommaListWithInvalidValue_DoesNotMatch()
+    {
+        // Arrange - List with one invalid value "10,abc,30"
+        var cronExpression = "10,abc,30 * * * *";
+        var time = new DateTime(2024, 1, 1, 12, 15, 0); // minute 15 is not in any valid value
+
+        // Act
+        var result = CronHelper.IsDue(cronExpression, time);
+
+        // Assert - Should return false because 15 doesn't match any valid value
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsDue_CommaListAllInvalidValues_ReturnsFalse()
+    {
+        // Arrange - List with all invalid values "abc,def,xyz"
+        var cronExpression = "abc,def,xyz * * * *";
+        var time = new DateTime(2024, 1, 1, 12, 30, 0);
+
+        // Act
+        var result = CronHelper.IsDue(cronExpression, time);
+
+        // Assert - Should return false because no valid values to match
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsDue_CommaListWithEmptyValue_IgnoresEmpty()
+    {
+        // Arrange - List with empty value "10,,30"
+        var cronExpression = "10,,30 * * * *";
+        var time = new DateTime(2024, 1, 1, 12, 30, 0); // minute 30 is a valid value in the list
+
+        // Act
+        var result = CronHelper.IsDue(cronExpression, time);
+
+        // Assert - Should return true because 30 is valid and matches
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsDue_CommaListMixedValidInvalid_MatchesValid()
+    {
+        // Arrange - Mixed list "5,10,abc,20,xyz,30"
+        var cronExpression = "5,10,abc,20,xyz,30 * * * *";
+        var time = new DateTime(2024, 1, 1, 12, 10, 0); // minute 10 is a valid value
+
+        // Act
+        var result = CronHelper.IsDue(cronExpression, time);
+
+        // Assert - Should return true because 10 is valid and matches
+        Assert.True(result);
+    }
 }

@@ -207,9 +207,9 @@ public static class CronHelper
         // List : "1,2,3"
         if (field.Contains(','))
         {
-            return field.Split(',').Select(int.Parse).Contains(value);
+            return field.Split(',')
+                .Any(s => int.TryParse(s, out int num) && num == value);
         }
-
         // Interval : "9-17"
         if (field.Contains('-'))
         {
