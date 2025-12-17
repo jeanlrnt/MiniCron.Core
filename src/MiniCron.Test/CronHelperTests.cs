@@ -189,9 +189,9 @@ public class CronHelperTests
     [Fact]
     public void IsDue_InvalidStepSyntaxInHourField_ReturnsFalse()
     {
-        // Arrange - Invalid "5/3" in hour field
+        // Arrange - Invalid "5/3" in hour field (must be "*/3" for step syntax)
         var cronExpression = "* 5/3 * * *";
-        var time = new DateTime(2024, 1, 1, 12, 30, 0); // hour 12 is divisible by 3
+        var time = new DateTime(2024, 1, 1, 12, 30, 0);
 
         // Act
         var result = CronHelper.IsDue(cronExpression, time);
