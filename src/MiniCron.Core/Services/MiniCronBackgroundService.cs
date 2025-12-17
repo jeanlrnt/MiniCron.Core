@@ -46,7 +46,7 @@ public class MiniCronBackgroundService : BackgroundService
         }
     }
 
-    private async Task RunJobs(CancellationToken stoppingToken)
+    private Task RunJobs(CancellationToken stoppingToken)
     {
         var now = DateTime.Now;
 
@@ -85,6 +85,8 @@ public class MiniCronBackgroundService : BackgroundService
                 _logger.LogError(ex, "Error evaluating Cron expression: {Cron}", job.CronExpression);
             }
         }
+
+        return Task.CompletedTask;
     }
 
     private async Task ExecuteJobScoped(Models.CronJob job, CancellationToken token)
