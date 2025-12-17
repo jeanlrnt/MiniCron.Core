@@ -82,7 +82,7 @@ public class MiniCronBackgroundService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erreur lors de l'évaluation du Cron: {Cron}", job.CronExpression);
+                _logger.LogError(ex, "Error evaluating Cron expression: {Cron}", job.CronExpression);
             }
         }
     }
@@ -97,7 +97,7 @@ public class MiniCronBackgroundService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Erreur lors de l'exécution de la tâche Cron: {Cron}", job.CronExpression);
+            _logger.LogError(ex, "Error executing Cron task: {Cron}", job.CronExpression);
         }
     }
 }
