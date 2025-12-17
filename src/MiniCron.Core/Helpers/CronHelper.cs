@@ -50,10 +50,8 @@ public static class CronHelper
         if (field.Contains(','))
         {
             return field.Split(',')
-                .Where(s => int.TryParse(s, out int num) && num == value)
-                .Any();
+                .Any(s => int.TryParse(s, out int num) && num == value);
         }
-
         // Interval : "9-17"
         if (field.Contains('-'))
         {
