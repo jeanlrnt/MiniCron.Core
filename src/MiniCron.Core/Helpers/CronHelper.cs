@@ -42,7 +42,7 @@ public static class CronHelper
         if (field.Contains('/'))
         {
             var split = field.Split('/');
-            if (split.Length == 2 && split[0] == "*" && int.TryParse(split[1], out int step))
+            if (split.Length == 2 && split[0] == "*" && int.TryParse(split[1], out int step) && step > 0)
                 return value % step == 0;
         }
 
