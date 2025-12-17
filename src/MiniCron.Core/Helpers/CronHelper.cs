@@ -38,7 +38,7 @@ public static class CronHelper
     {
         if (field == "*") return true;
 
-        // Pas : "*/5 
+        // Step : "*/5"
         if (field.Contains('/'))
         {
             var split = field.Split('/');
