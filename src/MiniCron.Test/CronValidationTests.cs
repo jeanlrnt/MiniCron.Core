@@ -289,6 +289,7 @@ public class CronValidationTests
         var exception = Assert.Throws<ArgumentException>(() => 
             CronHelper.ValidateCronExpression(expression));
         
-        Assert.Contains("cannot be empty", exception.Message);
+        Assert.Contains("Cron expression must have exactly 5 fields (min hour day month weekday), but got 4 field(s): ' * * * *'"
+          , exception.Message);
     }
 }
