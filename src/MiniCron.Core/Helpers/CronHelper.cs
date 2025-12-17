@@ -49,7 +49,11 @@ public static class CronHelper
         // List : "1,2,3"
         if (field.Contains(','))
         {
-            return field.Split(',').Select(int.Parse).Contains(value);
+            return field.Split(',')
+                .Select(s => int.TryParse(s, out int num) ? (int?)num : null)
+                .Where(n => n.HasValue)
+                .Select(n => n!.Value)
+                .Contains(value);
         }
 
         // Interval : "9-17"
