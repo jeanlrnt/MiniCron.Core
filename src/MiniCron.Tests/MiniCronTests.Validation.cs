@@ -1,8 +1,8 @@
 using MiniCron.Core.Helpers;
 
-namespace MiniCron.Test;
+namespace MiniCron.Tests;
 
-public class CronValidationTests
+public partial class MiniCronTests
 {
     [Fact]
     public void ValidateCronExpression_ValidExpression_DoesNotThrow()

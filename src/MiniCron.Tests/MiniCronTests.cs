@@ -3,9 +3,9 @@ using Microsoft.Extensions.Hosting;
 using MiniCron.Core.Extensions;
 using MiniCron.Core.Services;
 
-namespace MiniCron.Test;
+namespace MiniCron.Tests;
 
-public class MiniCronTests
+public partial class MiniCronTests
 {
     [Fact]
     public void ServiceCollectionExtensions_AddMiniCron_DefaultOptions()
