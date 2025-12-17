@@ -20,6 +20,24 @@ jobs:
 
       - name: Restore dependencies
         run: dotnet restore
+        
+      - name: Verify project version
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          Write-Host "Tag version: $version"
+          $csprojPath = Get-ChildItem -Path . -Filter *.csproj -Recurse | Select-Object -First 1
+          if (-not $csprojPath) {
+            Write-Error "No .csproj file found."
+            exit 1
+          }
+          [xml]$csproj = Get-Content $csprojPath.FullName
+          $projectVersion = $csproj.Project.PropertyGroup.Version
+          Write-Host "Project version: $projectVersion"
+          if ($projectVersion -ne $version) {
+            Write-Error "Version mismatch: Tag version '$version' does not match project version '$projectVersion'."
+            exit 1
+          }
 
       - name: Build the project
         run: dotnet build --configuration Release --no-restore
