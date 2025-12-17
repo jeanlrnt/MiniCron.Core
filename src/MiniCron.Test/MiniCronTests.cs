@@ -5,7 +5,7 @@ using MiniCron.Core.Services;
 
 namespace MiniCron.Test;
 
-public class MiniCronTests
+public partial class MiniCronTests
 {
     [Fact]
     public void ServiceCollectionExtensions_AddMiniCron_DefaultOptions()

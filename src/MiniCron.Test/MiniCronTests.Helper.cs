@@ -2,7 +2,7 @@ using MiniCron.Core.Helpers;
 
 namespace MiniCron.Test;
 
-public class CronHelperTests
+public partial class MiniCronTests
 {
     [Fact]
     public void IsDue_ValidStepSyntax_ReturnsTrue()

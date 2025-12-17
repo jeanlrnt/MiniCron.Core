@@ -2,7 +2,7 @@ using MiniCron.Core.Helpers;
 
 namespace MiniCron.Test;
 
-public class CronValidationTests
+public partial class MiniCronTests
 {
     [Fact]
     public void ValidateCronExpression_ValidExpression_DoesNotThrow()
