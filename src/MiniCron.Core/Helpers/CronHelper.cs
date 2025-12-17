@@ -17,7 +17,7 @@ public static class CronHelper
             throw new ArgumentNullException(nameof(cronExpression), "Cron expression cannot be null or empty.");
         }
 
-        var parts = cronExpression.Split(' ');
+        var parts = cronExpression.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 5)
         {
             throw new ArgumentException(
