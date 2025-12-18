@@ -110,17 +110,17 @@ Examples:
 
 Comprehensive guides and examples are available to help you integrate MiniCron.Core into your projects:
 
-### 📚 Examples
+### Examples
 
 - **[Console Application Example](docs/examples/ConsoleApp.md)** - Learn how to integrate MiniCron.Core into a minimal .NET Console application with step-by-step instructions and working examples.
 - **[Web Application Example](docs/examples/WebApp.md)** - Complete guide for ASP.NET Core applications including Minimal API, MVC, Web API, and Blazor Server examples with Entity Framework Core integration.
 
-### 📖 Guides
+### Guides
 
 - **[Configuration Guide](docs/guides/Configuration.md)** - Comprehensive information about configuring MiniCron.Core, including configuration sources, environment-specific settings, and a complete cron expression reference.
 - **[Advanced Scenarios Guide](docs/guides/AdvancedScenarios.md)** - Advanced usage patterns including error handling strategies, working with third-party services, distributed systems considerations, and performance optimization.
 
-### 🚀 Quick Start
+### Quick Start
 
 **Console Application:**
 ```bash
