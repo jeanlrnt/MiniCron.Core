@@ -399,12 +399,25 @@ builder.Services.AddMiniCron(options =>
             }
             
             // Execute backup command (SQL Server example)
-            // Note: For production use, consider using proper backup tools or stored procedures
-            var databaseName = dbContext.Database.GetDbConnection().Database;
-            var safeDbName = databaseName.Replace("]", "]]"); // Escape square brackets
-            var safePath = fullPath.Replace("'", "''"); // Escape single quotes
-            var backupCommand = $"BACKUP DATABASE [{safeDbName}] TO DISK = '{safePath}'";
-            await dbContext.Database.ExecuteSqlRawAsync(backupCommand, cancellationToken);
+            // IMPORTANT: This is a simplified example. In production:
+            // 1. Use stored procedures with proper permissions
+            // 2. Use dedicated backup tools or Azure Backup services
+            // 3. Implement proper access control and auditing
+            // 4. Consider using SQL Server Agent for scheduling
+            
+            // For this example, we'll use a stored procedure approach:
+            // CREATE PROCEDURE sp_BackupDatabase @BackupPath NVARCHAR(500)
+            // AS BEGIN
+            //     DECLARE @sql NVARCHAR(1000);
+            //     SET @sql = 'BACKUP DATABASE [YourDB] TO DISK = ''' + @BackupPath + '''';
+            //     EXEC sp_executesql @sql;
+            // END
+            
+            // Call the stored procedure
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "EXEC sp_BackupDatabase @p0",
+                fullPath,
+                cancellationToken);
             
             logger.LogInformation("Database backup created: {FileName}", fileName);
         }
