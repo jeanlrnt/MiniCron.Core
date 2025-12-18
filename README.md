@@ -106,6 +106,49 @@ Examples:
 - `0 0 * * *`: Every day at midnight
 - `0 12 * * 1`: Every Monday at 12:00 PM
 
+## Documentation
+
+Comprehensive guides and examples are available to help you integrate MiniCron.Core into your projects:
+
+### Examples
+
+- **[Console Application Example](docs/examples/ConsoleApp.md)** - Learn how to integrate MiniCron.Core into a minimal .NET Console application with step-by-step instructions and working examples.
+- **[Web Application Example](docs/examples/WebApp.md)** - Complete guide for ASP.NET Core applications including Minimal API, MVC, Web API, and Blazor Server examples with Entity Framework Core integration.
+
+### Guides
+
+- **[Configuration Guide](docs/guides/Configuration.md)** - Comprehensive information about configuring MiniCron.Core, including configuration sources, environment-specific settings, and a complete cron expression reference.
+- **[Advanced Scenarios Guide](docs/guides/AdvancedScenarios.md)** - Advanced usage patterns including error handling strategies, working with third-party services, distributed systems considerations, and performance optimization.
+
+### Quick Start
+
+**Console Application:**
+```bash
+dotnet new console -n MyApp
+cd MyApp
+dotnet add package MiniCron.Core
+dotnet add package Microsoft.Extensions.Hosting
+```
+
+See the [Console Application Example](docs/examples/ConsoleApp.md) for complete code.
+
+**Web Application:**
+```bash
+dotnet new web -n MyWebApp
+cd MyWebApp
+dotnet add package MiniCron.Core
+```
+
+See the [Web Application Example](docs/examples/WebApp.md) for complete code.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 ---
 
 Made with ❤️ by [jeanlrnt](https://github.com/jeanlrnt)
