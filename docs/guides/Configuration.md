@@ -181,7 +181,16 @@ dotnet user-secrets set "JobSchedules:DataSync" "* * * * *"
 
 Then access in code:
 ```csharp
-var schedule = builder.Configuration["JobSchedules:DataSync"];
+builder.Services.AddMiniCron(options =>
+{
+    var schedule = builder.Configuration["JobSchedules:DataSync"] ?? "*/10 * * * *";
+    options.AddJob(schedule, async (sp, ct) =>
+    {
+        using var scope = sp.CreateScope();
+        var syncService = scope.ServiceProvider.GetRequiredService<IDataSyncService>();
+        await syncService.SyncAsync(ct);
+    });
+});
 ```
 
 ## Environment-Specific Settings
@@ -411,7 +420,7 @@ public bool IsValidCronExpression(string expression)
     try
     {
         // CronHelper will throw if invalid
-        CronHelper.GetNextOccurrence(expression, DateTime.Now);
+        CronHelper.ValidateCronExpression(expression);
         return true;
     }
     catch

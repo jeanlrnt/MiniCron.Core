@@ -386,13 +386,25 @@ builder.Services.AddMiniCron(options =>
         try
         {
             var backupPath = config["BackupPath"] ?? "./backups";
+            Directory.CreateDirectory(backupPath);
+            
             var fileName = $"backup_{DateTime.Now:yyyyMMdd_HHmmss}.bak";
-            var fullPath = Path.Combine(backupPath, fileName);
+            var fullPath = Path.GetFullPath(Path.Combine(backupPath, fileName));
+            
+            // Validate path to prevent directory traversal attacks
+            if (!fullPath.StartsWith(Path.GetFullPath(backupPath)))
+            {
+                logger.LogError("Invalid backup path detected");
+                return;
+            }
             
             // Execute backup command (SQL Server example)
-            await dbContext.Database.ExecuteSqlRawAsync(
-                $"BACKUP DATABASE [{dbContext.Database.GetDbConnection().Database}] TO DISK = '{fullPath}'",
-                cancellationToken);
+            // Note: For production use, consider using proper backup tools or stored procedures
+            var databaseName = dbContext.Database.GetDbConnection().Database;
+            var safeDbName = databaseName.Replace("]", "]]"); // Escape square brackets
+            var safePath = fullPath.Replace("'", "''"); // Escape single quotes
+            var backupCommand = $"BACKUP DATABASE [{safeDbName}] TO DISK = '{safePath}'";
+            await dbContext.Database.ExecuteSqlRawAsync(backupCommand, cancellationToken);
             
             logger.LogInformation("Database backup created: {FileName}", fileName);
         }

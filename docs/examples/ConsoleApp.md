@@ -211,20 +211,19 @@ await app.RunAsync();
 
 ## Testing Cron Jobs
 
-For testing purposes, you can use frequent cron expressions:
+For testing purposes, you can use frequent cron expressions. Note that standard cron expressions support minutes as the smallest time unit:
 
 ```csharp
-// Run every 10 seconds (for testing only - requires custom implementation)
-// Note: Standard cron supports minutes as the smallest unit
-// For testing, use: "* * * * *" (every minute)
-
-// Test job that runs every minute
+// Test job that runs every minute (smallest interval supported)
 options.AddJob("* * * * *", async (serviceProvider, cancellationToken) =>
 {
     var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
     logger.LogInformation("Test job executed");
     await Task.CompletedTask;
 });
+
+// If you need sub-minute testing during development, 
+// consider using a test framework or mock time
 ```
 
 ## Common Cron Expressions for Console Apps
