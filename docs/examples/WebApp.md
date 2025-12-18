@@ -388,7 +388,7 @@ builder.Services.AddMiniCron(options =>
             var backupPath = config["BackupPath"] ?? "./backups";
             Directory.CreateDirectory(backupPath);
             
-            var fileName = $"backup_{DateTime.Now:yyyyMMdd_HHmmss}.bak";
+            var fileName = $"backup_{DateTime.UtcNow:yyyyMMdd_HHmmss}.bak";
             var fullPath = Path.GetFullPath(Path.Combine(backupPath, fileName));
             
             // Validate path to prevent directory traversal attacks
