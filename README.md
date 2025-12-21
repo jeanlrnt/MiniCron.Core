@@ -8,7 +8,7 @@
 [![Release](https://img.shields.io/github/v/release/jeanlrnt/MiniCron.Core?label=pre%20release&style=flat-square)](https://github.com/jeanlrnt/MiniCron.Core/releases)
 <!-- NuGet package version and total downloads -->
 [![NuGet](https://img.shields.io/nuget/v/MiniCron.Core?label=nuget&style=flat-square)](https://www.nuget.org/packages/MiniCron.Core)
-[![NuGet downloads](https://img.shields.io/nuget/dt/MiniCron.Core?style=flat-square)](https://www.nuget.org/packages/MiniCron.Core)
+[![NuGet downloads](https://img.shields.io/nuget/dt/MiniCron.Core)](https://www.nuget.org/packages/MiniCron.Core)
 [![dotnet](https://img.shields.io/badge/dotnet-8.0-blue?style=flat-square)](https://dotnet.microsoft.com/)
 <!-- Repository info: open issues, contributors, license, last commit -->
 [![Open issues](https://img.shields.io/github/issues/jeanlrnt/MiniCron.Core?style=flat-square)](https://github.com/jeanlrnt/MiniCron.Core/issues)
