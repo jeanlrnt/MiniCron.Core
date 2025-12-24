@@ -74,7 +74,7 @@ public partial class MiniCronTests
         Assert.NotNull(runJobsMethod);
 
         // Execute RunJobs which should trigger both jobs
-        var cancellationTokenSource = new CancellationTokenSource();
+        using var cancellationTokenSource = new CancellationTokenSource();
         var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cancellationTokenSource.Token })!;
         await task;
 
