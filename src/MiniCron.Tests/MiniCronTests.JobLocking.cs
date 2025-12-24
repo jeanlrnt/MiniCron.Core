@@ -34,28 +34,23 @@ public partial class MiniCronTests
     {
         // Arrange
         var services = new ServiceCollection();
-        var jobAExecuted = false;
-        var jobBExecuted = false;
-        var jobAStarted = new TaskCompletionSource<bool>();
-        var jobBCanStart = new TaskCompletionSource<bool>();
+        var jobAExecuted = new TaskCompletionSource<bool>();
+        var jobBExecuted = new TaskCompletionSource<bool>();
 
         services.AddMiniCron(options =>
         {
-            // Job A - takes time to execute
+            // Job A - marks completion
             options.AddJob("* * * * *", async (sp, ct) =>
             {
-                jobAStarted.SetResult(true);
-                // Wait for signal to ensure we test concurrent execution attempt
-                await jobBCanStart.Task;
-                await Task.Delay(10, ct); // Small delay
-                jobAExecuted = true;
+                await Task.Delay(50, ct); // Simulate work
+                jobAExecuted.SetResult(true);
             });
 
-            // Job B - quick execution with same schedule
+            // Job B - marks completion with same schedule
             options.AddJob("* * * * *", async (sp, ct) =>
             {
-                await Task.Delay(10, ct); // Small delay
-                jobBExecuted = true;
+                await Task.Delay(50, ct); // Simulate work
+                jobBExecuted.SetResult(true);
             });
         });
 
@@ -66,13 +61,6 @@ public partial class MiniCronTests
         var jobs = registry.GetJobs();
         Assert.Equal(2, jobs.Count);
         Assert.NotSame(jobs[0], jobs[1]);
-
-        // Allow Job B to start after Job A has started
-        _ = Task.Run(async () =>
-        {
-            await jobAStarted.Task;
-            jobBCanStart.SetResult(true);
-        });
 
         // Act - Manually execute jobs using reflection to test the background service behavior
         var backgroundService = serviceProvider.GetServices<Microsoft.Extensions.Hosting.IHostedService>()
@@ -90,11 +78,13 @@ public partial class MiniCronTests
         var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cancellationTokenSource.Token })!;
         await task;
 
-        // Wait a bit for the fire-and-forget tasks to complete
-        await Task.Delay(500);
+        // Wait for both jobs to complete using TaskCompletionSource
+        var completionTask = Task.WhenAll(jobAExecuted.Task, jobBExecuted.Task);
+        var completedInTime = await Task.WhenAny(completionTask, Task.Delay(2000)) == completionTask;
 
         // Assert - Both jobs should have executed
-        Assert.True(jobAExecuted, "Job A should have executed");
-        Assert.True(jobBExecuted, "Job B should have executed even though it has the same cron expression as Job A");
+        Assert.True(completedInTime, "Both jobs should have completed within the timeout");
+        Assert.True(jobAExecuted.Task.IsCompletedSuccessfully, "Job A should have executed");
+        Assert.True(jobBExecuted.Task.IsCompletedSuccessfully, "Job B should have executed even though it has the same cron expression as Job A");
     }
 }
