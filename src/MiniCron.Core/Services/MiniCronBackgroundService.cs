@@ -11,7 +11,7 @@ public class MiniCronBackgroundService : BackgroundService
     private readonly JobRegistry _registry;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<MiniCronBackgroundService> _logger;
-    private readonly ConcurrentDictionary<string, byte> _runningJobs = new();
+    private readonly ConcurrentDictionary<Models.CronJob, byte> _runningJobs = new();
 
     public MiniCronBackgroundService(
         JobRegistry registry,
@@ -57,7 +57,7 @@ public class MiniCronBackgroundService : BackgroundService
                 if (CronHelper.IsDue(job.CronExpression, now))
                 {
                     // Check if this job is already running to prevent duplicate executions
-                    if (_runningJobs.TryAdd(job.CronExpression, 0))
+                    if (_runningJobs.TryAdd(job, 0))
                     {
                         // Run the task in "Fire and Forget" (Task.Run) to avoid blocking
                         // the scheduler if the task is long.
@@ -70,7 +70,7 @@ public class MiniCronBackgroundService : BackgroundService
                             finally
                             {
                                 // Remove from running jobs when complete
-                                _runningJobs.TryRemove(job.CronExpression, out _);
+                                _runningJobs.TryRemove(job, out _);
                             }
                         }, stoppingToken);
                     }
