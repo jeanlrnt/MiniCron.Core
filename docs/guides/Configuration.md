@@ -178,19 +178,19 @@ builder.Services.Configure<MiniCronOptions>(builder.Configuration.GetSection("Mi
 // TimeZone requires conversion from string to TimeZoneInfo
 builder.Services.PostConfigure<MiniCronOptions>(opts =>
 {
-        var tzId = builder.Configuration["MiniCron:TimeZone"];
-        if (!string.IsNullOrEmpty(tzId))
+    var tzId = builder.Configuration["MiniCron:TimeZone"];
+    if (!string.IsNullOrEmpty(tzId))
+    {
+        try
         {
-                try
-                {
-                        opts.TimeZone = TimeZoneInfo.FindSystemTimeZoneById(tzId);
-                }
-                catch
-                {
-                        // Fallback to UTC if the configured timezone is invalid
-                        opts.TimeZone = TimeZoneInfo.Utc;
-                }
+            opts.TimeZone = TimeZoneInfo.FindSystemTimeZoneById(tzId);
         }
+        catch
+        {
+            // Fallback to UTC if the configured timezone is invalid
+            opts.TimeZone = TimeZoneInfo.Utc;
+        }
+    }
 });
 
 // Register MiniCron services (uses configured options)
