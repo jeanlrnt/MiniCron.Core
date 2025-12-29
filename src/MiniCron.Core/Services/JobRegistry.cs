@@ -93,10 +93,10 @@ public class JobRegistry : IDisposable
             _lock.ExitWriteLock();
         }
 
-        if (removed && removedJob != null)
+        if (removed)
         {
-            _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, removedJob.CronExpression);
-            JobRemoved?.Invoke(this, new JobEventArgs(removedJob));
+            _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, removedJob!.CronExpression);
+            JobRemoved?.Invoke(this, new JobEventArgs(removedJob!));
         }
         
         return removed;
@@ -134,10 +134,10 @@ public class JobRegistry : IDisposable
             _lock.ExitWriteLock();
         }
 
-        if (updated && existingJob != null && updatedJob != null)
+        if (updated)
         {
-            _logger?.LogInformation("Job updated: {JobId} {OldCron} -> {NewCron}", jobId, existingJob.CronExpression, newCronExpression);
-            JobUpdated?.Invoke(this, new JobEventArgs(updatedJob, existingJob));
+            _logger?.LogInformation("Job updated: {JobId} {OldCron} -> {NewCron}", jobId, existingJob!.CronExpression, newCronExpression);
+            JobUpdated?.Invoke(this, new JobEventArgs(updatedJob!, existingJob!));
         }
 
         return updated;
