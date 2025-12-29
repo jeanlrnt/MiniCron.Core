@@ -106,14 +106,22 @@ public class MiniCronBackgroundService : BackgroundService
                     // Check if this job is already running to prevent duplicate executions
                     if (_runningJobs.TryAdd(job.Id, 0))
                     {
-                        // Run the task in "Fire and Forget" (Task.Run) to avoid blocking
-                        // the scheduler if the task is long. Future batches will replace
-                        // this with a bounded dispatcher.
+                        // Dispatch the job. Keep using Task.Run for now. log lifecycle.
+                        _logger.LogInformation("Dispatching job {JobId} {Cron}", job.Id, job.CronExpression);
                         _ = Task.Run(async () =>
                         {
+                            var sw = System.Diagnostics.Stopwatch.StartNew();
+                            _logger.LogInformation("Job started {JobId}", job.Id);
                             try
                             {
                                 await ExecuteJobScoped(job, stoppingToken);
+                                sw.Stop();
+                                _logger.LogInformation("Job completed {JobId} in {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
+                            }
+                            catch (Exception ex)
+                            {
+                                sw.Stop();
+                                _logger.LogError(ex, "Job {JobId} failed after {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                             }
                             finally
                             {
