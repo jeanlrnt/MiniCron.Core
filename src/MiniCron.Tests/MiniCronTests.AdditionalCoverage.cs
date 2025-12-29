@@ -530,8 +530,8 @@ public partial class MiniCronTests
         
         registry.ScheduleJob("* * * * *", async (sp, ct) =>
         {
-            executionCount++;
-            jobStarted.SetResult(true);
+            Interlocked.Increment(ref executionCount);
+            jobStarted.TrySetResult(true);
             await jobCanComplete.Task;
         });
         
@@ -554,6 +554,8 @@ public partial class MiniCronTests
         // Start first execution
         var task1 = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
         await task1;
+        
+        // Wait for job to actually start
         await jobStarted.Task;
         
         // Try to run again while first is still running
@@ -689,15 +691,14 @@ public partial class MiniCronTests
         var jobExecuted = false;
         var registry = new JobRegistry();
         
-        var jobId = registry.ScheduleJob("* * * * *", async (sp, ct) =>
+        // Create a job that will have a specific timeout
+        // Note: CronJob.Timeout is currently read-only, so this test verifies the default timeout path
+        // Future enhancement: support job-specific timeouts via JobRegistry API
+        registry.ScheduleJob("* * * * *", async (sp, ct) =>
         {
             jobExecuted = true;
             await Task.Delay(10, ct);
         });
-        
-        // Get the job and modify it to have a specific timeout
-        var jobs = registry.GetJobs();
-        var job = jobs.First(j => j.Id == jobId);
         
         services.AddSingleton(registry);
         services.AddSingleton<IHostedService, MiniCronBackgroundService>();
