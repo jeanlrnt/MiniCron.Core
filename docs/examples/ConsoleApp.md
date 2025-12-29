@@ -63,6 +63,43 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
+### Quick: Using overloads and subscribing to job events
+
+If you prefer the registry-style initializer (also supported), you can register jobs using the ergonomic overloads and subscribe to lifecycle events:
+
+```csharp
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Services.AddMiniCron(registry =>
+{
+    // Subscribe to registry events
+    registry.JobAdded += (s, e) => Console.WriteLine($"Job added: {e.Job.Id} {e.Job.CronExpression}");
+    registry.JobRemoved += (s, e) => Console.WriteLine($"Job removed: {e.Job.Id}");
+    registry.JobUpdated += (s, e) => Console.WriteLine($"Job updated: {e.Job.Id} {e.PreviousJob?.CronExpression} -> {e.Job.CronExpression}");
+
+    // Use overload that accepts CancellationToken-aware delegate
+    registry.ScheduleJob("*/5 * * * *", async (ct) =>
+    {
+        Console.WriteLine("Running token-aware job every 5 minutes");
+        await Task.CompletedTask;
+    });
+
+    // Use simple synchronous Action overload
+    registry.ScheduleJob("* * * * *", () => Console.WriteLine("Simple action every minute"));
+
+    // Legacy-style delegate that receives IServiceProvider
+    registry.ScheduleJob("0 * * * *", (sp, ct) =>
+    {
+        var logger = sp?.GetService<ILogger<Program>>();
+        logger?.LogInformation("Hourly job executed");
+        return Task.CompletedTask;
+    });
+});
+
+var app = builder.Build();
+await app.RunAsync();
+```
+
 ### 4. Run the Application
 
 ```bash

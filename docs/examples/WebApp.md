@@ -81,6 +81,32 @@ app.MapGet("/", () => "MiniCron Web App is running!");
 app.Run();
 ```
 
+### Quick: Registry overloads and event hooks
+
+You can subscribe to registry events and use the ergonomic overloads when registering MiniCron:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddMiniCron(registry =>
+{
+    registry.JobAdded += (s, e) => builder.Logging.CreateLogger("MiniCron").LogInformation($"Job added: {e.Job.Id} {e.Job.CronExpression}");
+
+    // Token-aware job
+    registry.ScheduleJob("*/10 * * * *", async (ct) =>
+    {
+        // perform async work with cancellation
+        await Task.Delay(10, ct);
+    });
+
+    // Simple synchronous action
+    registry.ScheduleJob("0 * * * *", () => Console.WriteLine("Hourly maintenance task"));
+});
+
+var app = builder.Build();
+app.Run();
+```
+
 ## Working with Entity Framework Core
 
 ### Setup with DbContext
