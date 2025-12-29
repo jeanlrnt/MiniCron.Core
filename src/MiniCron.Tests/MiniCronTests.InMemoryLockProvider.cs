@@ -30,7 +30,7 @@ public partial class MiniCronTests
         var jobId2 = Guid.NewGuid();
         var a4 = await provider.TryAcquireAsync(jobId2, TimeSpan.FromMilliseconds(50), CancellationToken.None);
         Assert.True(a4);
-        await Task.Delay(120);
+        await Task.Delay(120, cts.Token);
         var a5 = await provider.TryAcquireAsync(jobId2, TimeSpan.FromMilliseconds(50), CancellationToken.None);
         Assert.True(a5);
     }
