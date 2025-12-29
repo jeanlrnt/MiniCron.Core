@@ -100,6 +100,45 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
+## Example: Configure with AddMiniCronOptions and read via IOptions
+
+This short example shows configuring scheduler behavior via `AddMiniCronOptions(...)` and resolving `IOptions<MiniCronOptions>` inside a scheduled job.
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using MiniCron.Core.Extensions;
+using MiniCron.Core.Models;
+
+var builder = Host.CreateApplicationBuilder(args);
+builder.Logging.AddConsole();
+
+// Configure scheduler defaults (timezone, concurrency, timeouts)
+builder.Services.AddMiniCronOptions(opts =>
+{
+    opts.TimeZone = TimeZoneInfo.Utc;
+    opts.MaxConcurrency = 5;
+    opts.DefaultJobTimeout = TimeSpan.FromMinutes(2);
+});
+
+var app = builder.Build();
+
+// Register runtime jobs using the JobRegistry singleton
+var registry = app.Services.GetRequiredService<JobRegistry>();
+registry.ScheduleJob("* * * * *", (serviceProvider, cancellationToken) =>
+{
+    // Resolve configured options inside the job
+    var configured = serviceProvider.GetRequiredService<IOptions<MiniCronOptions>>().Value;
+    var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("Running job (TZ={TZ}, Max={Max})", configured.TimeZone, configured.MaxConcurrency);
+    return Task.CompletedTask;
+});
+
+await app.RunAsync();
+```
+
 ### 4. Run the Application
 
 ```bash
