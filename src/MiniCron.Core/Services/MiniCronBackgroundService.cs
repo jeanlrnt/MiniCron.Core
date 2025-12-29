@@ -16,19 +16,24 @@ public class MiniCronBackgroundService : BackgroundService
     private readonly ConcurrentDictionary<Guid, byte> _runningJobs = new();
     private readonly MiniCronOptions _options;
     private readonly ISystemClock _clock;
+    private readonly IJobLockProvider _lockProvider;
+    private readonly SemaphoreSlim _concurrencySemaphore;
 
     public MiniCronBackgroundService(
         JobRegistry registry,
         IServiceProvider serviceProvider,
         ILogger<MiniCronBackgroundService> logger,
         IOptions<MiniCronOptions>? options,
-        ISystemClock clock)
+        ISystemClock clock,
+        IJobLockProvider? lockProvider = null)
     {
         _registry = registry;
         _serviceProvider = serviceProvider;
         _logger = logger;
         _options = options?.Value ?? new MiniCronOptions();
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _lockProvider = lockProvider ?? new InMemoryJobLockProvider();
+        _concurrencySemaphore = new SemaphoreSlim(Math.Max(1, _options.MaxConcurrency));
     }
 
     // Backwards-compatible constructor for callers that instantiate/register the hosted
@@ -114,9 +119,45 @@ public class MiniCronBackgroundService : BackgroundService
                             _logger.LogInformation("Job started {JobId}", job.Id);
                             try
                             {
-                                await ExecuteJobScoped(job, stoppingToken);
-                                sw.Stop();
-                                _logger.LogInformation("Job completed {JobId} in {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
+                                // Acquire concurrency semaphore
+                                await _concurrencySemaphore.WaitAsync(stoppingToken);
+
+                                // Attempt to acquire distributed lock (TTL = job timeout or default)
+                                var ttl = job.Timeout ?? _options.DefaultJobTimeout ?? TimeSpan.FromMinutes(30);
+                                var acquired = await _lockProvider.TryAcquireAsync(job.Id, ttl, stoppingToken);
+
+                                if (!acquired)
+                                {
+                                    _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
+                                    return;
+                                }
+
+                                try
+                                {
+                                    // Execute with timeout enforcement
+                                    var jobTimeout = job.Timeout ?? _options.DefaultJobTimeout;
+                                    if (jobTimeout.HasValue)
+                                    {
+                                        using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                                        cts.CancelAfter(jobTimeout.Value);
+                                        await ExecuteJobScoped(job, cts.Token);
+                                    }
+                                    else
+                                    {
+                                        await ExecuteJobScoped(job, stoppingToken);
+                                    }
+
+                                    sw.Stop();
+                                    _logger.LogInformation("Job completed {JobId} in {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
+                                }
+                                finally
+                                {
+                                    await _lockProvider.ReleaseAsync(job.Id);
+                                }
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                _logger.LogWarning("Job {JobId} cancelled", job.Id);
                             }
                             catch (Exception ex)
                             {
@@ -127,6 +168,15 @@ public class MiniCronBackgroundService : BackgroundService
                             {
                                 // Remove from running jobs when complete
                                 _runningJobs.TryRemove(job.Id, out _);
+                                // Release concurrency slot
+                                try
+                                {
+                                    _concurrencySemaphore.Release();
+                                }
+                                catch
+                                {
+                                    _logger.LogError("Error releasing concurrency semaphore for job {JobId}", job.Id);
+                                }
                             }
                         }, stoppingToken);
                     }
