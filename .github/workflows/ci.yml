@@ -3,6 +3,9 @@ name: CI
 on:
   pull_request:
     branches: ["**"]
+    types: [opened, reopened]
+  push:
+    branches: [main]
 
 jobs:
   build-and-test:
@@ -36,4 +39,74 @@ jobs:
         with:
           name: test-results-${{ matrix.os }}-${{ matrix.dotnet-version }}
           path: src/MiniCron.Tests/TestResults/*.trx
+
+  code-coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore MiniCron.sln
+
+      - name: Build
+        run: dotnet build MiniCron.sln -c Release --no-restore
+
+      - name: Test with coverage
+        run: |
+          dotnet test src/MiniCron.Tests/MiniCron.Tests.csproj -c Release --no-build --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+      - name: Generate coverage report
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.4.2
+        with:
+          reports: './coverage/**/coverage.cobertura.xml'
+          targetdir: './coveragereport'
+          reporttypes: 'MarkdownSummaryGithub;Cobertura;Badges'
+
+      - name: Write coverage to summary
+        run: cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Extract coverage percentage
+        id: coverage
+        run: |
+          # Extract line coverage percentage from the Cobertura XML
+          COVERAGE=$(python3 -c "import xml.etree.ElementTree as ET; root = ET.parse('./coveragereport/Cobertura.xml').getroot(); print(f\"{float(root.get('line-rate', 0)) * 100:.1f}\")")
+          echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "Line Coverage: $COVERAGE%"
+
+      - name: Commit coverage badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Create .github directory if it doesn't exist
+          mkdir -p .github/badges
+          
+          # Copy the generated badge
+          cp coveragereport/badge_linecoverage.svg .github/badges/coverage.svg
+          
+          # Add and commit if there are changes
+          git add .github/badges/coverage.svg
+          if ! git diff --staged --quiet; then
+            git commit -m "Update coverage badge [skip ci]"
+            git push
+          else
+            echo "No coverage badge changes to commit"
+          fi
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coveragereport/
 

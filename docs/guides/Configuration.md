@@ -151,6 +151,57 @@ var app = builder.Build();
 app.Run();
 ```
 
+### Binding `MiniCronOptions` from appsettings.json
+
+You can bind scheduler-level options from configuration using the Options pattern. Note: `TimeZoneInfo` is not bound automatically from a string, so we demonstrate storing a timezone identifier and applying it in `PostConfigure`.
+
+**appsettings.json**
+```json
+{
+    "MiniCron": {
+        "TimeZone": "UTC",
+        "Granularity": "Minute",
+        "MaxConcurrency": 5,
+        "DefaultJobTimeout": "00:02:00",
+        "WaitForJobsOnShutdown": true
+    }
+}
+```
+
+**Program.cs**
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+// Bind MiniCronOptions from configuration
+builder.Services.Configure<MiniCronOptions>(builder.Configuration.GetSection("MiniCron"));
+
+// TimeZone requires conversion from string to TimeZoneInfo
+builder.Services.PostConfigure<MiniCronOptions>(opts =>
+{
+    var tzId = builder.Configuration["MiniCron:TimeZone"];
+    if (!string.IsNullOrEmpty(tzId))
+    {
+        try
+        {
+            opts.TimeZone = TimeZoneInfo.FindSystemTimeZoneById(tzId);
+        }
+        catch
+        {
+            // Fallback to UTC if the configured timezone is invalid
+            opts.TimeZone = TimeZoneInfo.Utc;
+        }
+    }
+});
+
+// Register MiniCron services (uses configured options)
+builder.Services.AddMiniCronOptions();
+
+var app = builder.Build();
+app.Run();
+```
+
+After binding, scheduled jobs can resolve `IOptions<MiniCronOptions>` from `IServiceProvider` if they need to read runtime settings.
+
 ### Environment Variables
 
 Use environment variables for sensitive or environment-specific configurations:

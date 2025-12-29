@@ -1,5 +1,6 @@
 ﻿using MiniCron.Core.Helpers;
 using MiniCron.Core.Models;
+using Microsoft.Extensions.Logging;
 
 namespace MiniCron.Core.Services;
 
@@ -7,6 +8,16 @@ public class JobRegistry : IDisposable
 {
     private readonly Dictionary<Guid, CronJob> _jobs = new();
     private readonly ReaderWriterLockSlim _lock = new();
+    private readonly ILogger<JobRegistry>? _logger;
+
+    public event EventHandler<JobEventArgs>? JobAdded;
+    public event EventHandler<JobEventArgs>? JobRemoved;
+    public event EventHandler<JobEventArgs>? JobUpdated;
+
+    public JobRegistry(ILogger<JobRegistry>? logger = null)
+    {
+        _logger = logger;
+    }
 
     /// <summary>
     /// Schedules a new job with the specified cron expression and action.
@@ -16,21 +27,44 @@ public class JobRegistry : IDisposable
     /// <returns>A unique identifier for the scheduled job.</returns>
     public Guid ScheduleJob(string cronExpression, Func<IServiceProvider, CancellationToken, Task> action)
     {
-        // Validate the cron expression before adding the job
         CronHelper.ValidateCronExpression(cronExpression);
 
         var job = new CronJob(cronExpression, action);
-        
+
         _lock.EnterWriteLock();
         try
         {
             _jobs.Add(job.Id, job);
-            return job.Id;
         }
         finally
         {
             _lock.ExitWriteLock();
         }
+
+        _logger?.LogInformation("Job added: {JobId} {Cron}", job.Id, job.CronExpression);
+        JobAdded?.Invoke(this, new JobEventArgs(job));
+
+        return job.Id;
+    }
+
+    /// <summary>
+    /// Ergonomic overload accepting a token-aware delegate.
+    /// </summary>
+    public Guid ScheduleJob(string cronExpression, Func<CancellationToken, Task> action)
+    {
+        return ScheduleJob(cronExpression, (_, ct) => action(ct));
+    }
+
+    /// <summary>
+    /// Ergonomic overload accepting a simple synchronous action.
+    /// </summary>
+    public Guid ScheduleJob(string cronExpression, Action action)
+    {
+        return ScheduleJob(cronExpression, (_, _) =>
+        {
+            action(); 
+            return Task.CompletedTask;
+        });
     }
 
     /// <summary>
@@ -40,15 +74,32 @@ public class JobRegistry : IDisposable
     /// <returns>True if the job was found and removed; otherwise, false.</returns>
     public bool RemoveJob(Guid jobId)
     {
+        CronJob? removedJob = null;
+        bool removed;
+        
         _lock.EnterWriteLock();
         try
         {
-            return _jobs.Remove(jobId);
+            if (!_jobs.TryGetValue(jobId, out var job)) return false;
+            
+            removed = _jobs.Remove(jobId);
+            if (removed)
+            {
+                removedJob = job;
+            }
         }
         finally
         {
             _lock.ExitWriteLock();
         }
+
+        if (removed)
+        {
+            _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, removedJob!.CronExpression);
+            JobRemoved?.Invoke(this, new JobEventArgs(removedJob!));
+        }
+        
+        return removed;
     }
 
     /// <summary>
@@ -59,36 +110,56 @@ public class JobRegistry : IDisposable
     /// <returns>True if the job was found and updated; otherwise, false.</returns>
     public bool UpdateSchedule(Guid jobId, string newCronExpression)
     {
-        // Validate the new cron expression before updating
         CronHelper.ValidateCronExpression(newCronExpression);
 
+        CronJob? existingJob = null;
+        CronJob? updatedJob = null;
+        bool updated;
+        
         _lock.EnterWriteLock();
         try
         {
-            if (_jobs.TryGetValue(jobId, out var existingJob))
+            if (!_jobs.TryGetValue(jobId, out var job))
             {
-                // Create a new CronJob with the updated expression (records are immutable)
-                var updatedJob = existingJob with { CronExpression = newCronExpression };
-                _jobs[jobId] = updatedJob;
-                return true;
+                return false;
             }
-            return false;
+            
+            existingJob = job;
+            updatedJob = existingJob with { CronExpression = newCronExpression };
+            _jobs[jobId] = updatedJob;
+            updated = true;
         }
         finally
         {
             _lock.ExitWriteLock();
         }
+
+        if (updated)
+        {
+            _logger?.LogInformation("Job updated: {JobId} {OldCron} -> {NewCron}", jobId, existingJob!.CronExpression, newCronExpression);
+            JobUpdated?.Invoke(this, new JobEventArgs(updatedJob!, existingJob!));
+        }
+
+        return updated;
     }
 
     /// <summary>
-    /// Adds a new job with the specified cron expression and action.
-    /// This method maintains backward compatibility with the original API.
+    /// Adds a new job with the specified cron expression and action. Backward-compatible.
     /// </summary>
     /// <param name="cronExpression">The cron expression defining when the job should run.</param>
     /// <param name="action">The action to execute when the job is triggered.</param>
     public void AddJob(string cronExpression, Func<IServiceProvider, CancellationToken, Task> action)
     {
-        // Call ScheduleJob but discard the ID to match existing signature
+        ScheduleJob(cronExpression, action);
+    }
+
+    /// <summary>
+    /// Adds a backward-compatible overload for simple actions.
+    /// </summary>
+    /// <param name="cronExpression">The cron expression defining when the job should run.</param>
+    /// <param name="action">The action to execute when the job is triggered.</param>
+    public void AddJob(string cronExpression, Action action)
+    {
         ScheduleJob(cronExpression, action);
     }
 

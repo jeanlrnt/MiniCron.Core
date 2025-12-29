@@ -63,6 +63,82 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
+### Quick: Using overloads and subscribing to job events
+
+If you prefer the registry-style initializer (also supported), you can register jobs using the ergonomic overloads and subscribe to lifecycle events:
+
+```csharp
+var builder = Host.CreateApplicationBuilder(args);
+
+builder.Services.AddMiniCron(registry =>
+{
+    // Subscribe to registry events
+    registry.JobAdded += (s, e) => Console.WriteLine($"Job added: {e.Job.Id} {e.Job.CronExpression}");
+    registry.JobRemoved += (s, e) => Console.WriteLine($"Job removed: {e.Job.Id}");
+    registry.JobUpdated += (s, e) => Console.WriteLine($"Job updated: {e.Job.Id} {e.PreviousJob?.CronExpression} -> {e.Job.CronExpression}");
+
+    // Use overload that accepts CancellationToken-aware delegate
+    registry.ScheduleJob("*/5 * * * *", async (ct) =>
+    {
+        Console.WriteLine("Running token-aware job every 5 minutes");
+        await Task.CompletedTask;
+    });
+
+    // Use simple synchronous Action overload
+    registry.ScheduleJob("* * * * *", () => Console.WriteLine("Simple action every minute"));
+
+    // Legacy-style delegate that receives IServiceProvider
+    registry.ScheduleJob("0 * * * *", (sp, ct) =>
+    {
+        var logger = sp?.GetService<ILogger<Program>>();
+        logger?.LogInformation("Hourly job executed");
+        return Task.CompletedTask;
+    });
+});
+
+var app = builder.Build();
+await app.RunAsync();
+```
+
+## Example: Configure with AddMiniCronOptions and read via IOptions
+
+This short example shows configuring scheduler behavior via `AddMiniCronOptions(...)` and resolving `IOptions<MiniCronOptions>` inside a scheduled job.
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using MiniCron.Core.Extensions;
+using MiniCron.Core.Models;
+
+var builder = Host.CreateApplicationBuilder(args);
+builder.Logging.AddConsole();
+
+// Configure scheduler defaults (timezone, concurrency, timeouts)
+builder.Services.AddMiniCronOptions(opts =>
+{
+    opts.TimeZone = TimeZoneInfo.Utc;
+    opts.MaxConcurrency = 5;
+    opts.DefaultJobTimeout = TimeSpan.FromMinutes(2);
+});
+
+var app = builder.Build();
+
+// Register runtime jobs using the JobRegistry singleton
+var registry = app.Services.GetRequiredService<JobRegistry>();
+registry.ScheduleJob("* * * * *", (serviceProvider, cancellationToken) =>
+{
+    // Resolve configured options inside the job
+    var configured = serviceProvider.GetRequiredService<IOptions<MiniCronOptions>>().Value;
+    var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("Running job (TZ={TZ}, Max={Max})", configured.TimeZone, configured.MaxConcurrency);
+    return Task.CompletedTask;
+});
+
+await app.RunAsync();
+```
+
 ### 4. Run the Application
 
 ```bash

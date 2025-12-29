@@ -1,6 +1,6 @@
 ﻿namespace MiniCron.Core.Models;
 
-public record CronJob(string CronExpression, Func<IServiceProvider, CancellationToken, Task> Action)
+public record CronJob(string CronExpression, Func<IServiceProvider, CancellationToken, Task> Action, TimeSpan? Timeout = null)
 {
     /// <summary>
     /// Unique identifier for this job instance to ensure proper dictionary key uniqueness.
@@ -8,4 +8,9 @@ public record CronJob(string CronExpression, Func<IServiceProvider, Cancellation
     /// would otherwise be treated as equal due to record value-based equality.
     /// </summary>
     public Guid Id { get; } = Guid.NewGuid();
+
+    /// <summary>
+    /// Optional per-job timeout. If null, the scheduler-level default will be used.
+    /// </summary>
+    public TimeSpan? Timeout { get; init; }
 }
