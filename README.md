@@ -2,7 +2,7 @@
 
 <!-- Continuous Integration (main test/build workflow) -->
 [![CI](https://img.shields.io/github/actions/workflow/status/jeanlrnt/MiniCron.Core/ci.yml?label=CI&style=flat-square&logo=github)](https://github.com/jeanlrnt/MiniCron.Core/actions)
-[![Code Coverage](https://img.shields.io/badge/coverage-84.3%25-yellow?style=flat-square)](https://github.com/jeanlrnt/MiniCron.Core/actions/workflows/ci.yml)
+![Code Coverage](https://img.shields.io/badge/coverage-84.3%25-yellow?style=flat-square)
 [![Publish](https://img.shields.io/github/actions/workflow/status/jeanlrnt/MiniCron.Core/publish.yml?label=publish&style=flat-square&logo=github)](https://github.com/jeanlrnt/MiniCron.Core/actions/workflows/nuget-publish.yml)
 <!-- Latest GitHub release / tag -->
 [![Release](https://img.shields.io/github/v/release/jeanlrnt/MiniCron.Core?label=latest%20release&style=flat-square)](https://github.com/jeanlrnt/MiniCron.Core/releases)

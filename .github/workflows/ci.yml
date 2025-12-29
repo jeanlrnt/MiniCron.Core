@@ -65,10 +65,17 @@ jobs:
         with:
           reports: './coverage/**/coverage.cobertura.xml'
           targetdir: './coveragereport'
-          reporttypes: 'MarkdownSummaryGithub;Cobertura'
+          reporttypes: 'MarkdownSummaryGithub;Cobertura;Badges'
 
       - name: Write coverage to summary
         run: cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage badge
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-badge
+          path: coveragereport/badge_linecoverage.svg
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4

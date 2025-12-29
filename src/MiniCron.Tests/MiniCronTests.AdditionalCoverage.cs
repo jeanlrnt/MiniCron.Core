@@ -498,4 +498,24 @@ public partial class MiniCronTests
         // Should not throw even with invalid cron expression
         await task;
     }
+    
+    [Fact]
+    public void MiniCronBackgroundService_Constructor_WithNullClock_ThrowsArgumentNullException()
+    {
+        var services = new ServiceCollection();
+        var registry = new JobRegistry();
+        
+        services.AddSingleton(registry);
+        services.AddLogging();
+        
+        var serviceProvider = services.BuildServiceProvider();
+        var logger = serviceProvider.GetRequiredService<ILogger<MiniCronBackgroundService>>();
+        
+        Assert.Throws<ArgumentNullException>(() => new MiniCronBackgroundService(
+            registry,
+            serviceProvider,
+            logger,
+            null,
+            null)); // null clock should throw
+    }
 }
