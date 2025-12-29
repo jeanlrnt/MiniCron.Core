@@ -74,23 +74,32 @@ public class JobRegistry : IDisposable
     /// <returns>True if the job was found and removed; otherwise, false.</returns>
     public bool RemoveJob(Guid jobId)
     {
+        CronJob? removedJob = null;
+        bool removed;
+        
         _lock.EnterWriteLock();
         try
         {
             if (!_jobs.TryGetValue(jobId, out var job)) return false;
             
-            var removed = _jobs.Remove(jobId);
-
-            if (!removed) return removed;
-            
-            _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, job.CronExpression);
-            JobRemoved?.Invoke(this, new JobEventArgs(job));
-            return removed;
+            removed = _jobs.Remove(jobId);
+            if (removed)
+            {
+                removedJob = job;
+            }
         }
         finally
         {
             _lock.ExitWriteLock();
         }
+
+        if (removed)
+        {
+            _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, removedJob!.CronExpression);
+            JobRemoved?.Invoke(this, new JobEventArgs(removedJob!));
+        }
+        
+        return removed;
     }
 
     /// <summary>
@@ -103,23 +112,35 @@ public class JobRegistry : IDisposable
     {
         CronHelper.ValidateCronExpression(newCronExpression);
 
+        CronJob? existingJob = null;
+        CronJob? updatedJob = null;
+        bool updated;
+        
         _lock.EnterWriteLock();
         try
         {
-            if (!_jobs.TryGetValue(jobId, out var existingJob)) return false;
+            if (!_jobs.TryGetValue(jobId, out var job))
+            {
+                return false;
+            }
             
-            var updatedJob = existingJob with { CronExpression = newCronExpression };
+            existingJob = job;
+            updatedJob = existingJob with { CronExpression = newCronExpression };
             _jobs[jobId] = updatedJob;
-
-            _logger?.LogInformation("Job updated: {JobId} {OldCron} -> {NewCron}", jobId, existingJob.CronExpression, newCronExpression);
-            JobUpdated?.Invoke(this, new JobEventArgs(updatedJob, existingJob));
-
-            return true;
+            updated = true;
         }
         finally
         {
             _lock.ExitWriteLock();
         }
+
+        if (updated)
+        {
+            _logger?.LogInformation("Job updated: {JobId} {OldCron} -> {NewCron}", jobId, existingJob!.CronExpression, newCronExpression);
+            JobUpdated?.Invoke(this, new JobEventArgs(updatedJob!, existingJob!));
+        }
+
+        return updated;
     }
 
     /// <summary>
