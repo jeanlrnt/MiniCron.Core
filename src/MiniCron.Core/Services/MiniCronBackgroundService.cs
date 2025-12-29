@@ -217,7 +217,7 @@ public class MiniCronBackgroundService : BackgroundService
 
     public override void Dispose()
     {
-        _concurrencySemaphore?.Dispose();
+        _concurrencySemaphore.Dispose();
         base.Dispose();
     }
 }

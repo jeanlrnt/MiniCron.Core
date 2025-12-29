@@ -12,11 +12,11 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
 
     public async Task<bool> TryAcquireAsync(Guid jobId, TimeSpan ttl, CancellationToken cancellationToken)
     {
-        var now = DateTimeOffset.UtcNow;
-        var expiry = now.Add(ttl);
-
         while (!cancellationToken.IsCancellationRequested)
         {
+            var now = DateTimeOffset.UtcNow;
+            var expiry = now.Add(ttl);
+
             // Try add new lock
             if (_locks.TryAdd(jobId, expiry))
             {
@@ -40,7 +40,6 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
             {
                 break;
             }
-            now = DateTimeOffset.UtcNow;
         }
 
         return false;
