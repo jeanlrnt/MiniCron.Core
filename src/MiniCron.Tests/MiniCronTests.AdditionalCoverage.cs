@@ -477,6 +477,7 @@ public partial class MiniCronTests
         
         // Manually add an invalid job (bypassing validation for testing error handling)
         var job = new CronJob("invalid cron", (sp, ct) => Task.CompletedTask);
+        Assert.NotNull(job);
         
         services.AddSingleton(registry);
         services.AddSingleton<IHostedService, MiniCronBackgroundService>();
