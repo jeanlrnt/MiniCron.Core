@@ -22,6 +22,7 @@ public static class MiniCronExtensions
         // Core services
         services.AddSingleton<JobRegistry>();
         services.AddSingleton<ISystemClock, SystemClock>();
+        services.AddSingleton<IJobLockProvider, InMemoryJobLockProvider>();
 
         // Hosted service
         services.AddHostedService<MiniCronBackgroundService>();
