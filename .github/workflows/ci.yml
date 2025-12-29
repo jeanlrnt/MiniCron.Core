@@ -41,9 +41,13 @@ jobs:
 
   code-coverage:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -70,12 +74,34 @@ jobs:
       - name: Write coverage to summary
         run: cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload coverage badge
+      - name: Extract coverage percentage
+        id: coverage
+        run: |
+          # Extract line coverage percentage from the Cobertura XML
+          COVERAGE=$(python3 -c "import xml.etree.ElementTree as ET; root = ET.parse('./coveragereport/Cobertura.xml').getroot(); print(f\"{float(root.get('line-rate', 0)) * 100:.1f}\")")
+          echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "Line Coverage: $COVERAGE%"
+
+      - name: Commit coverage badge
+        if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Create .github directory if it doesn't exist
+          mkdir -p .github/badges
+          
+          # Copy the generated badge
+          cp coveragereport/badge_linecoverage.svg .github/badges/coverage.svg
+          
+          # Add and commit if there are changes
+          git add .github/badges/coverage.svg || true
+          git diff --staged --quiet || git commit -m "Update coverage badge [skip ci]" || true
+
+      - name: Push coverage badge
         if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-badge
-          path: coveragereport/badge_linecoverage.svg
+        run: |
+          git push || echo "No changes to push"
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
