@@ -3,9 +3,9 @@ name: CI
 on:
   pull_request:
     branches: ["**"]
-    types: [opened, reopened]
+    types: [opened, reopened, ready_for_review]
   push:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   build-and-test:
