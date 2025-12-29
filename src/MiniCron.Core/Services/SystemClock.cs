@@ -4,8 +4,8 @@ public class SystemClock : ISystemClock
 {
     public DateTime UtcNow => DateTime.UtcNow;
 
-    public DateTime Now(TimeZoneInfo? timeZone)
+    public DateTime Now(TimeZoneInfo timeZone)
     {
-        return timeZone == null ? DateTime.Now : TimeZoneInfo.ConvertTime(DateTime.UtcNow, timeZone);
+        return TimeZoneInfo.ConvertTime(DateTime.UtcNow, timeZone);
     }
 }

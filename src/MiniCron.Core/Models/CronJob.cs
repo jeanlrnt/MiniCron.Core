@@ -12,5 +12,5 @@ public record CronJob(string CronExpression, Func<IServiceProvider, Cancellation
     /// <summary>
     /// Optional per-job timeout. If null, the scheduler-level default will be used.
     /// </summary>
-    public TimeSpan? Timeout { get; init; } = Timeout;
+    public TimeSpan? Timeout { get; init; }
 }

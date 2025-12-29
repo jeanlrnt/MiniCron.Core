@@ -22,12 +22,12 @@ public partial class MiniCronTests
     }
     
     [Fact]
-    public void SystemClock_Now_WithNullTimeZone_ReturnsLocalTime()
+    public void SystemClock_Now_WithUtcTimeZone_ReturnsUtcTime()
     {
         var clock = new SystemClock();
-        var before = DateTime.Now;
-        var actual = clock.Now(null);
-        var after = DateTime.Now;
+        var before = DateTime.UtcNow;
+        var actual = clock.Now(TimeZoneInfo.Utc);
+        var after = DateTime.UtcNow;
         
         Assert.True(actual >= before && actual <= after.AddMilliseconds(200));
     }
@@ -516,7 +516,7 @@ public partial class MiniCronTests
             serviceProvider,
             logger,
             null,
-            null)); // null clock should throw
+            null!)); // null clock should throw
     }
     
     [Fact]

@@ -10,7 +10,7 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
 {
     private readonly ConcurrentDictionary<Guid, DateTimeOffset> _locks = new();
 
-    public Task<bool> TryAcquireAsync(Guid jobId, TimeSpan ttl, CancellationToken cancellationToken)
+    public async Task<bool> TryAcquireAsync(Guid jobId, TimeSpan ttl, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
         var expiry = now.Add(ttl);
@@ -20,24 +20,30 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
             // Try add new lock
             if (_locks.TryAdd(jobId, expiry))
             {
-                return Task.FromResult(true);
+                return true;
             }
 
             // If existing lock expired, try to replace it
-            if (_locks.TryGetValue(jobId, out var existingExpiry) && existingExpiry <= now)
+            if (_locks.TryGetValue(jobId, out var existingExpiry)
+                && existingExpiry <= now
+                && _locks.TryUpdate(jobId, expiry, existingExpiry))
             {
-                if (_locks.TryUpdate(jobId, expiry, existingExpiry))
-                {
-                    return Task.FromResult(true);
-                }
+                return true;
             }
 
             // Small backoff to avoid tight-looping
-            Thread.Sleep(5);
+            try
+            {
+                await Task.Delay(5, cancellationToken);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
             now = DateTimeOffset.UtcNow;
         }
 
-        return Task.FromResult(false);
+        return false;
     }
 
     public Task ReleaseAsync(Guid jobId)
