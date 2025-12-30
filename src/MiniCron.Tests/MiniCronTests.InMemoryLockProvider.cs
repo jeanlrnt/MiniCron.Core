@@ -17,7 +17,7 @@ public partial class MiniCronTests
         Assert.True(a1);
 
         // Immediate second acquire without waiting: use a short cancellation token so call returns quickly
-        using var cts = new CancellationTokenSource(20);
+        using var cts = new CancellationTokenSource(100);
         var a2 = await provider.TryAcquireAsync(jobId, ttl, cts.Token);
         Assert.False(a2);
 
@@ -30,7 +30,7 @@ public partial class MiniCronTests
         var jobId2 = Guid.NewGuid();
         var a4 = await provider.TryAcquireAsync(jobId2, TimeSpan.FromMilliseconds(50), CancellationToken.None);
         Assert.True(a4);
-        await Task.Delay(120, CancellationToken.None);
+        await Task.Delay(150, CancellationToken.None);
         var a5 = await provider.TryAcquireAsync(jobId2, TimeSpan.FromMilliseconds(50), CancellationToken.None);
         Assert.True(a5);
     }

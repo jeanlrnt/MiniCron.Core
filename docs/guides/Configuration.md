@@ -185,9 +185,16 @@ builder.Services.PostConfigure<MiniCronOptions>(opts =>
         {
             opts.TimeZone = TimeZoneInfo.FindSystemTimeZoneById(tzId);
         }
-        catch
+        catch (TimeZoneNotFoundException ex)
         {
-            // Fallback to UTC if the configured timezone is invalid
+            // Log configuration error and fallback to UTC if the configured timezone is invalid
+            System.Console.Error.WriteLine($"MiniCron configuration error: invalid time zone '{tzId}'. Falling back to UTC. {ex}");
+            opts.TimeZone = TimeZoneInfo.Utc;
+        }
+        catch (InvalidTimeZoneException ex)
+        {
+            // Log configuration error and fallback to UTC if the configured timezone data is invalid
+            System.Console.Error.WriteLine($"MiniCron configuration error: invalid time zone data for '{tzId}'. Falling back to UTC. {ex}");
             opts.TimeZone = TimeZoneInfo.Utc;
         }
     }

@@ -35,15 +35,13 @@ public class JobRegistry : IDisposable
         try
         {
             _jobs.Add(job.Id, job);
+            _logger?.LogInformation("Job added: {JobId} {Cron}", job.Id, job.CronExpression);
+            JobAdded?.Invoke(this, new JobEventArgs(job));
         }
         finally
         {
             _lock.ExitWriteLock();
         }
-
-        _logger?.LogInformation("Job added: {JobId} {Cron}", job.Id, job.CronExpression);
-        JobAdded?.Invoke(this, new JobEventArgs(job));
-
         return job.Id;
     }
 
