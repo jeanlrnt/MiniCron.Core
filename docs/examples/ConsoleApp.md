@@ -90,8 +90,11 @@ builder.Services.AddMiniCron(registry =>
     // Legacy-style delegate that receives IServiceProvider
     registry.ScheduleJob("0 * * * *", (sp, ct) =>
     {
-        var logger = sp?.GetService<ILogger<Program>>();
-        logger?.LogInformation("Hourly job executed");
+        var logger = sp.GetService<ILogger<Program>>();
+        if (logger is not null)
+        {
+            logger.LogInformation("Hourly job executed");
+        }
         return Task.CompletedTask;
     });
 });

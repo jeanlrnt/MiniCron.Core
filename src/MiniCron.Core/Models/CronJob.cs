@@ -9,8 +9,4 @@ public record CronJob(string CronExpression, Func<IServiceProvider, Cancellation
     /// </summary>
     public Guid Id { get; } = Guid.NewGuid();
 
-    /// <summary>
-    /// Optional per-job timeout. If null, the scheduler-level default will be used.
-    /// </summary>
-    public TimeSpan? Timeout { get; init; }
 }

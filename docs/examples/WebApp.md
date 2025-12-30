@@ -129,7 +129,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMiniCron(registry =>
 {
-    registry.JobAdded += (s, e) => builder.Logging.CreateLogger("MiniCron").LogInformation($"Job added: {e.Job.Id} {e.Job.CronExpression}");
+    registry.JobAdded += (s, e) => Console.WriteLine($"Job added: {e.Job.Id} {e.Job.CronExpression}");
 
     // Token-aware job
     registry.ScheduleJob("*/10 * * * *", async (ct) =>

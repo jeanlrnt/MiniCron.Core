@@ -159,9 +159,9 @@ public class MiniCronBackgroundService : BackgroundService
                                         {
                                             _concurrencySemaphore.Release();
                                         }
-                                        catch
+                                        catch (System.Threading.SemaphoreFullException ex)
                                         {
-                                            _logger.LogError("Error releasing concurrency semaphore for job {JobId}", job.Id);
+                                            _logger.LogError(ex, "Error releasing concurrency semaphore for job {JobId}", job.Id);
                                         }
                                     }
                                 }
