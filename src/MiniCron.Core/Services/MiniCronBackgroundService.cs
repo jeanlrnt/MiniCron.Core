@@ -17,6 +17,7 @@ public class MiniCronBackgroundService : BackgroundService
     private readonly MiniCronOptions _options;
     private readonly ISystemClock _clock;
     private readonly IJobLockProvider _lockProvider;
+    private readonly bool _ownsLockProvider;
     private readonly SemaphoreSlim _concurrencySemaphore;
 
     public MiniCronBackgroundService(
@@ -32,7 +33,18 @@ public class MiniCronBackgroundService : BackgroundService
         _logger = logger;
         _options = options?.Value ?? new MiniCronOptions();
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
-        _lockProvider = lockProvider ?? new InMemoryJobLockProvider();
+        
+        if (lockProvider == null)
+        {
+            _lockProvider = new InMemoryJobLockProvider();
+            _ownsLockProvider = true;
+        }
+        else
+        {
+            _lockProvider = lockProvider;
+            _ownsLockProvider = false;
+        }
+        
         _concurrencySemaphore = new SemaphoreSlim(Math.Max(1, _options.MaxConcurrency));
     }
 
@@ -42,7 +54,7 @@ public class MiniCronBackgroundService : BackgroundService
         JobRegistry registry,
         IServiceProvider serviceProvider,
         ILogger<MiniCronBackgroundService> logger)
-        : this(registry, serviceProvider, logger, Options.Create(new MiniCronOptions()), new SystemClock())
+        : this(registry, serviceProvider, logger, Options.Create(new MiniCronOptions()), new SystemClock(), null)
     {
     }
 
@@ -119,20 +131,20 @@ public class MiniCronBackgroundService : BackgroundService
                             _logger.LogInformation("Job started {JobId}", job.Id);
                             try
                             {
-                                // Attempt to acquire distributed lock (TTL = job timeout or default)
-                                var ttl = job.Timeout ?? _options.DefaultJobTimeout ?? TimeSpan.FromMinutes(30);
-                                var acquired = await _lockProvider.TryAcquireAsync(job.Id, ttl, stoppingToken);
-
-                                if (!acquired)
-                                {
-                                    _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
-                                    return;
-                                }
+                                // Acquire concurrency semaphore first to avoid holding lock while waiting
+                                await _concurrencySemaphore.WaitAsync(stoppingToken);
 
                                 try
                                 {
-                                    // Acquire concurrency semaphore after lock is acquired
-                                    await _concurrencySemaphore.WaitAsync(stoppingToken);
+                                    // Attempt to acquire distributed lock (TTL = job timeout or default)
+                                    var ttl = job.Timeout ?? _options.DefaultJobTimeout ?? TimeSpan.FromMinutes(30);
+                                    var acquired = await _lockProvider.TryAcquireAsync(job.Id, ttl, stoppingToken);
+
+                                    if (!acquired)
+                                    {
+                                        _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
+                                        return;
+                                    }
 
                                     try
                                     {
@@ -154,20 +166,20 @@ public class MiniCronBackgroundService : BackgroundService
                                     }
                                     finally
                                     {
-                                        // Release concurrency slot
-                                        try
-                                        {
-                                            _concurrencySemaphore.Release();
-                                        }
-                                        catch (System.Threading.SemaphoreFullException ex)
-                                        {
-                                            _logger.LogError(ex, "Error releasing concurrency semaphore for job {JobId}", job.Id);
-                                        }
+                                        await _lockProvider.ReleaseAsync(job.Id);
                                     }
                                 }
                                 finally
                                 {
-                                    await _lockProvider.ReleaseAsync(job.Id);
+                                    // Release concurrency slot
+                                    try
+                                    {
+                                        _concurrencySemaphore.Release();
+                                    }
+                                    catch (System.Threading.SemaphoreFullException ex)
+                                    {
+                                        _logger.LogError(ex, "Error releasing concurrency semaphore for job {JobId}", job.Id);
+                                    }
                                 }
                             }
                             catch (OperationCanceledException)
@@ -218,6 +230,12 @@ public class MiniCronBackgroundService : BackgroundService
     public override void Dispose()
     {
         _concurrencySemaphore.Dispose();
+        
+        if (_ownsLockProvider && _lockProvider is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+        
         base.Dispose();
     }
 }
