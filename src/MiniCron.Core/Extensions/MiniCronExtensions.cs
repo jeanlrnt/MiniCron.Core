@@ -47,6 +47,7 @@ public static class MiniCronExtensions
         });
         
         services.AddSingleton<ISystemClock, SystemClock>();
+        services.AddSingleton<IJobLockProvider, InMemoryJobLockProvider>();
         services.AddHostedService<MiniCronBackgroundService>();
 
         return services;
