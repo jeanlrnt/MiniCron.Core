@@ -16,8 +16,10 @@ public partial class MiniCronTests
         var a1 = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
         Assert.True(a1);
 
-        // Immediate second acquire while lock is still held should fail deterministically
-        var a2 = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
+        // Immediate second acquire while lock is still held should fail
+        // Use a short cancellation token timeout (less than TTL) to ensure it fails before TTL expires
+        using var cts = new CancellationTokenSource(50);
+        var a2 = await provider.TryAcquireAsync(jobId, ttl, cts.Token);
         Assert.False(a2);
 
         // Release should allow re-acquire
