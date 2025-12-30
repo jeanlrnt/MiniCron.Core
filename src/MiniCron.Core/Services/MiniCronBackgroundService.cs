@@ -50,11 +50,18 @@ public class MiniCronBackgroundService : BackgroundService
 
     // Backwards-compatible constructor for callers that instantiate/register the hosted
     // service without providing IOptions or ISystemClock via DI.
+    // Checks if these services are available in the serviceProvider before creating new instances.
     public MiniCronBackgroundService(
         JobRegistry registry,
         IServiceProvider serviceProvider,
         ILogger<MiniCronBackgroundService> logger)
-        : this(registry, serviceProvider, logger, Options.Create(new MiniCronOptions()), new SystemClock(), null)
+        : this(
+            registry, 
+            serviceProvider, 
+            logger, 
+            serviceProvider.GetService<IOptions<MiniCronOptions>>() ?? Options.Create(new MiniCronOptions()),
+            serviceProvider.GetService<ISystemClock>() ?? new SystemClock(),
+            serviceProvider.GetService<IJobLockProvider>())
     {
     }
 
