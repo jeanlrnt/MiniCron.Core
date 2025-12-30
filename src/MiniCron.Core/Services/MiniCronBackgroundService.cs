@@ -182,7 +182,8 @@ public class MiniCronBackgroundService : BackgroundService
                             }
                             catch (OperationCanceledException)
                             {
-                                _logger.LogWarning("Job {JobId} cancelled", job.Id);
+                                sw.Stop();
+                                _logger.LogWarning("Job {JobId} cancelled after {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                             }
                             catch (Exception ex)
                             {
@@ -191,6 +192,11 @@ public class MiniCronBackgroundService : BackgroundService
                             }
                             finally
                             {
+                                // Ensure stopwatch is stopped
+                                if (sw.IsRunning)
+                                {
+                                    sw.Stop();
+                                }
                                 // Remove from running jobs when complete
                                 _runningJobs.TryRemove(job.Id, out _);
                             }
