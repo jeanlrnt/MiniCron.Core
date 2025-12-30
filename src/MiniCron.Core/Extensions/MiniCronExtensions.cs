@@ -21,6 +21,7 @@ public static class MiniCronExtensions
         services.AddLogging();
 
         // Core services
+        // JobRegistry dependencies (including ILogger<JobRegistry>) are automatically resolved by DI
         services.AddSingleton<JobRegistry>();
         services.AddSingleton<ISystemClock, SystemClock>();
         services.AddSingleton<IJobLockProvider, InMemoryJobLockProvider>();
