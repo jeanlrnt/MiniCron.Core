@@ -75,9 +75,9 @@ public partial class MiniCronTests
         
         provider.Dispose();
         
-        // After dispose, should be able to acquire again (locks cleared)
-        var acquired = await provider.TryAcquireAsync(jobId, TimeSpan.FromMinutes(1), CancellationToken.None);
-        Assert.True(acquired);
+        // After dispose, attempting to acquire should throw ObjectDisposedException
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+            await provider.TryAcquireAsync(jobId, TimeSpan.FromMinutes(1), CancellationToken.None));
     }
     
     [Fact]

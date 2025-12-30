@@ -38,4 +38,22 @@ public partial class MiniCronTests
         var a5 = await provider.TryAcquireAsync(jobId2, ttlForJob2, CancellationToken.None);
         Assert.True(a5);
     }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_ThrowsObjectDisposedException_AfterDispose()
+    {
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+
+        // Dispose the provider
+        provider.Dispose();
+
+        // TryAcquireAsync should throw ObjectDisposedException
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+            await provider.TryAcquireAsync(jobId, TimeSpan.FromSeconds(1), CancellationToken.None));
+
+        // ReleaseAsync should throw ObjectDisposedException
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+            await provider.ReleaseAsync(jobId));
+    }
 }

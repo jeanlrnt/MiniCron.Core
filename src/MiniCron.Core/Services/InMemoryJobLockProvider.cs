@@ -9,9 +9,15 @@ namespace MiniCron.Core.Services;
 public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
 {
     private readonly ConcurrentDictionary<Guid, DateTimeOffset> _locks = new();
+    private bool _disposed;
 
     public async Task<bool> TryAcquireAsync(Guid jobId, TimeSpan ttl, CancellationToken cancellationToken)
     {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(InMemoryJobLockProvider));
+        }
+
         while (!cancellationToken.IsCancellationRequested)
         {
             var now = DateTimeOffset.UtcNow;
@@ -50,12 +56,18 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
 
     public Task ReleaseAsync(Guid jobId)
     {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(InMemoryJobLockProvider));
+        }
+
         _locks.TryRemove(jobId, out _);
         return Task.CompletedTask;
     }
 
     public void Dispose()
     {
+        _disposed = true;
         _locks.Clear();
     }
 }
