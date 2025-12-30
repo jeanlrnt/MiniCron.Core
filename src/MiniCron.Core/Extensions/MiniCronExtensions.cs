@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MiniCron.Core.Services;
 using MiniCron.Core.Models;
 
@@ -35,12 +36,18 @@ public static class MiniCronExtensions
     /// </summary>
     public static IServiceCollection AddMiniCron(this IServiceCollection services, Action<JobRegistry> configure)
     {
-        var registry = new JobRegistry();
-        configure(registry);
-
         services.AddLogging();
-        services.AddSingleton(registry);
+        
+        services.AddSingleton<JobRegistry>(sp =>
+        {
+            var logger = sp.GetService<ILogger<JobRegistry>>();
+            var registry = new JobRegistry(logger);
+            configure(registry);
+            return registry;
+        });
+        
         services.AddSingleton<ISystemClock, SystemClock>();
+        services.AddSingleton<IJobLockProvider, InMemoryJobLockProvider>();
         services.AddHostedService<MiniCronBackgroundService>();
 
         return services;

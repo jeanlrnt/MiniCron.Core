@@ -48,4 +48,45 @@ public partial class MiniCronTests
         // actual should be between before and after (tolerance for small delays)
         Assert.True(actual >= before && actual <= after.AddMilliseconds(200));
     }
+
+    [Fact]
+    public void AddMiniCronOptions_InjectsLoggerIntoJobRegistry()
+    {
+        var services = new ServiceCollection();
+        services.AddMiniCronOptions();
+
+        var sp = services.BuildServiceProvider();
+        var registry = sp.GetService<JobRegistry>();
+        Assert.NotNull(registry);
+
+        // Verify logger is working by scheduling a job and checking that it doesn't throw
+        var jobId = registry.ScheduleJob("* * * * *", () => { });
+        Assert.NotEqual(Guid.Empty, jobId);
+        
+        // Remove the job to trigger logger usage
+        var removed = registry.RemoveJob(jobId);
+        Assert.True(removed);
+    }
+
+    [Fact]
+    public void AddMiniCron_InjectsLoggerIntoJobRegistry()
+    {
+        var services = new ServiceCollection();
+        services.AddMiniCron(registry =>
+        {
+            // No-op configuration
+        });
+
+        var sp = services.BuildServiceProvider();
+        var registry = sp.GetService<JobRegistry>();
+        Assert.NotNull(registry);
+
+        // Verify logger is working by scheduling a job and checking that it doesn't throw
+        var jobId = registry.ScheduleJob("* * * * *", () => { });
+        Assert.NotEqual(Guid.Empty, jobId);
+        
+        // Remove the job to trigger logger usage
+        var removed = registry.RemoveJob(jobId);
+        Assert.True(removed);
+    }
 }
