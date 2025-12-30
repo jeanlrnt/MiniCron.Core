@@ -59,10 +59,20 @@ public class MiniCronBackgroundService : BackgroundService
             registry, 
             serviceProvider, 
             logger, 
-            serviceProvider.GetService<IOptions<MiniCronOptions>>() ?? Options.Create(new MiniCronOptions()),
-            serviceProvider.GetService<ISystemClock>() ?? new SystemClock(),
+            ResolveOptions(serviceProvider),
+            ResolveClock(serviceProvider),
             serviceProvider.GetService<IJobLockProvider>())
     {
+    }
+
+    private static IOptions<MiniCronOptions> ResolveOptions(IServiceProvider serviceProvider)
+    {
+        return serviceProvider.GetService<IOptions<MiniCronOptions>>() ?? Options.Create(new MiniCronOptions());
+    }
+
+    private static ISystemClock ResolveClock(IServiceProvider serviceProvider)
+    {
+        return serviceProvider.GetService<ISystemClock>() ?? new SystemClock();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
