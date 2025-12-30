@@ -234,7 +234,8 @@ public class MiniCronBackgroundService : BackgroundService
         {
             disposable.Dispose();
         }
-        
+
+        _concurrencySemaphore?.Dispose();
         base.Dispose();
     }
 }
