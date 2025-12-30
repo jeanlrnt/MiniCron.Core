@@ -37,16 +37,15 @@ public static class MiniCronExtensions
     public static IServiceCollection AddMiniCron(this IServiceCollection services, Action<JobRegistry> configure)
     {
         services.AddLogging();
-
-        // Build a temporary service provider to resolve the logger for JobRegistry
-        using (var tempProvider = services.BuildServiceProvider())
+        
+        services.AddSingleton<JobRegistry>(sp =>
         {
-            var logger = tempProvider.GetService<ILogger<JobRegistry>>();
+            var logger = sp.GetService<ILogger<JobRegistry>>();
             var registry = new JobRegistry(logger);
             configure(registry);
-            services.AddSingleton(registry);
-        }
-
+            return registry;
+        });
+        
         services.AddSingleton<ISystemClock, SystemClock>();
         services.AddHostedService<MiniCronBackgroundService>();
 

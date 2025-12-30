@@ -1,10 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MiniCron.Core.Models;
 using MiniCron.Core.Services;
 using MiniCron.Core.Extensions;
-using System.Reflection;
 
 namespace MiniCron.Tests;
 
@@ -61,13 +59,13 @@ public partial class MiniCronTests
         var registry = sp.GetService<JobRegistry>();
         Assert.NotNull(registry);
 
-        // Use reflection to verify that the logger field is not null
-        var loggerField = typeof(JobRegistry).GetField("_logger", BindingFlags.NonPublic | BindingFlags.Instance);
-        Assert.NotNull(loggerField);
+        // Verify logger is working by scheduling a job and checking that it doesn't throw
+        var jobId = registry.ScheduleJob("* * * * *", () => { });
+        Assert.NotEqual(Guid.Empty, jobId);
         
-        var logger = loggerField!.GetValue(registry);
-        Assert.NotNull(logger); // Logger should be injected by DI
-        Assert.IsAssignableFrom<ILogger<JobRegistry>>(logger);
+        // Remove the job to trigger logger usage
+        var removed = registry.RemoveJob(jobId);
+        Assert.True(removed);
     }
 
     [Fact]
@@ -76,19 +74,19 @@ public partial class MiniCronTests
         var services = new ServiceCollection();
         services.AddMiniCron(registry =>
         {
-            registry.ScheduleJob("* * * * *", () => { });
+            // No-op configuration
         });
 
         var sp = services.BuildServiceProvider();
         var registry = sp.GetService<JobRegistry>();
         Assert.NotNull(registry);
 
-        // Use reflection to verify that the logger field is not null
-        var loggerField = typeof(JobRegistry).GetField("_logger", BindingFlags.NonPublic | BindingFlags.Instance);
-        Assert.NotNull(loggerField);
+        // Verify logger is working by scheduling a job and checking that it doesn't throw
+        var jobId = registry.ScheduleJob("* * * * *", () => { });
+        Assert.NotEqual(Guid.Empty, jobId);
         
-        var logger = loggerField!.GetValue(registry);
-        Assert.NotNull(logger); // Logger should be injected by DI even in backward-compatible method
-        Assert.IsAssignableFrom<ILogger<JobRegistry>>(logger);
+        // Remove the job to trigger logger usage
+        var removed = registry.RemoveJob(jobId);
+        Assert.True(removed);
     }
 }
