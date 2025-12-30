@@ -1,8 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MiniCron.Core.Models;
 using MiniCron.Core.Services;
 using MiniCron.Core.Extensions;
+using System.Reflection;
 
 namespace MiniCron.Tests;
 
@@ -47,5 +49,46 @@ public partial class MiniCronTests
 
         // actual should be between before and after (tolerance for small delays)
         Assert.True(actual >= before && actual <= after.AddMilliseconds(200));
+    }
+
+    [Fact]
+    public void AddMiniCronOptions_InjectsLoggerIntoJobRegistry()
+    {
+        var services = new ServiceCollection();
+        services.AddMiniCronOptions();
+
+        var sp = services.BuildServiceProvider();
+        var registry = sp.GetService<JobRegistry>();
+        Assert.NotNull(registry);
+
+        // Use reflection to verify that the logger field is not null
+        var loggerField = typeof(JobRegistry).GetField("_logger", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(loggerField);
+        
+        var logger = loggerField!.GetValue(registry);
+        Assert.NotNull(logger); // Logger should be injected by DI
+        Assert.IsAssignableFrom<ILogger<JobRegistry>>(logger);
+    }
+
+    [Fact]
+    public void AddMiniCron_InjectsLoggerIntoJobRegistry()
+    {
+        var services = new ServiceCollection();
+        services.AddMiniCron(registry =>
+        {
+            registry.ScheduleJob("* * * * *", () => { });
+        });
+
+        var sp = services.BuildServiceProvider();
+        var registry = sp.GetService<JobRegistry>();
+        Assert.NotNull(registry);
+
+        // Use reflection to verify that the logger field is not null
+        var loggerField = typeof(JobRegistry).GetField("_logger", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(loggerField);
+        
+        var logger = loggerField!.GetValue(registry);
+        Assert.NotNull(logger); // Logger should be injected by DI even in backward-compatible method
+        Assert.IsAssignableFrom<ILogger<JobRegistry>>(logger);
     }
 }
