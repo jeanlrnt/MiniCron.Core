@@ -129,10 +129,12 @@ public class MiniCronBackgroundService : BackgroundService
                         {
                             var sw = System.Diagnostics.Stopwatch.StartNew();
                             _logger.LogInformation("Job started {JobId}", job.Id);
+                            var semaphoreAcquired = false;
                             try
                             {
                                 // Acquire concurrency semaphore first to avoid holding lock while waiting
                                 await _concurrencySemaphore.WaitAsync(stoppingToken);
+                                semaphoreAcquired = true;
 
                                 try
                                 {
@@ -171,14 +173,10 @@ public class MiniCronBackgroundService : BackgroundService
                                 }
                                 finally
                                 {
-                                    // Release concurrency slot
-                                    try
+                                    // Release concurrency slot only if it was acquired
+                                    if (semaphoreAcquired)
                                     {
                                         _concurrencySemaphore.Release();
-                                    }
-                                    catch (System.Threading.SemaphoreFullException ex)
-                                    {
-                                        _logger.LogError(ex, "Error releasing concurrency semaphore for job {JobId}", job.Id);
                                     }
                                 }
                             }
