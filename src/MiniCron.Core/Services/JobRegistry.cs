@@ -10,8 +10,34 @@ public class JobRegistry : IDisposable
     private readonly ReaderWriterLockSlim _lock = new();
     private readonly ILogger<JobRegistry>? _logger;
 
+    /// <summary>
+    /// Occurs when a job is added to the registry.
+    /// </summary>
+    /// <remarks>
+    /// This event is raised outside the write lock after the job has been added to the registry.
+    /// Event handlers may observe a registry state that has changed since the event was triggered,
+    /// as other operations can modify the registry between the event being raised and the handler executing.
+    /// </remarks>
     public event EventHandler<JobEventArgs>? JobAdded;
+    
+    /// <summary>
+    /// Occurs when a job is removed from the registry.
+    /// </summary>
+    /// <remarks>
+    /// This event is raised outside the write lock after the job has been removed from the registry.
+    /// Event handlers may observe a registry state that has changed since the event was triggered,
+    /// as other operations can modify the registry between the event being raised and the handler executing.
+    /// </remarks>
     public event EventHandler<JobEventArgs>? JobRemoved;
+    
+    /// <summary>
+    /// Occurs when a job's schedule is updated in the registry.
+    /// </summary>
+    /// <remarks>
+    /// This event is raised outside the write lock after the job has been updated in the registry.
+    /// Event handlers may observe a registry state that has changed since the event was triggered,
+    /// as other operations can modify the registry between the event being raised and the handler executing.
+    /// </remarks>
     public event EventHandler<JobEventArgs>? JobUpdated;
 
     public JobRegistry(ILogger<JobRegistry>? logger = null)
