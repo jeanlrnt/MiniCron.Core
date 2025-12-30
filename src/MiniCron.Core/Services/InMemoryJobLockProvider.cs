@@ -9,7 +9,7 @@ namespace MiniCron.Core.Services;
 public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
 {
     private readonly ConcurrentDictionary<Guid, DateTimeOffset> _locks = new();
-    private readonly SemaphoreSlim _lockReleasedSignal = new(0);
+    private readonly SemaphoreSlim _lockReleasedSignal = new(0, 1);
 
     /// <summary>
     /// Attempts to acquire a lock for the specified job with a time-to-live (TTL).
@@ -75,10 +75,14 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
         _locks.TryRemove(jobId, out _);
         
         // Signal waiting threads that a lock has been released
-        // Note: If CurrentCount is already at max, this is a no-op
-        if (_lockReleasedSignal.CurrentCount == 0)
+        // Use try-catch to handle the case where count is already at max
+        try
         {
             _lockReleasedSignal.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+            // Already at max count, no action needed
         }
         
         return Task.CompletedTask;
