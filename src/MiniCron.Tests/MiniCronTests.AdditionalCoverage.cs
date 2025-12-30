@@ -813,8 +813,8 @@ public partial class MiniCronTests
             jobStarted.SetResult(true);
             try
             {
-                // Wait for cancellation
-                await Task.Delay(TimeSpan.FromMinutes(1), ct);
+                // Wait for cancellation - using a long delay that will be interrupted
+                await Task.Delay(TimeSpan.FromSeconds(30), ct);
             }
             catch (OperationCanceledException)
             {
@@ -843,7 +843,7 @@ public partial class MiniCronTests
         
         // Wait for job to start before cancelling
         await jobStarted.Task;
-        await Task.Delay(50); // Give job time to enter execution
+        await Task.Delay(TimeSpan.FromMilliseconds(50)); // Give job time to enter execution
         
         // Cancel the token while job is running
         cts.Cancel();
@@ -852,7 +852,7 @@ public partial class MiniCronTests
         await task;
         
         // Wait for cancellation to be processed
-        var cancelledInTime = await Task.WhenAny(jobCancelled.Task, Task.Delay(1000)) == jobCancelled.Task;
+        var cancelledInTime = await Task.WhenAny(jobCancelled.Task, Task.Delay(TimeSpan.FromSeconds(1))) == jobCancelled.Task;
         
         // Assert - Job should have been cancelled
         // The stopwatch should be stopped in the OperationCanceledException handler
@@ -909,7 +909,7 @@ public partial class MiniCronTests
         await task;
         
         // Wait for processing
-        await Task.Delay(100);
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
         
         // Assert - Job should not have executed because lock acquisition failed
         // The stopwatch should be stopped in the finally block
