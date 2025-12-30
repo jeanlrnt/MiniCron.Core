@@ -806,12 +806,21 @@ public partial class MiniCronTests
         var services = new ServiceCollection();
         var registry = new JobRegistry();
         var jobStarted = new TaskCompletionSource<bool>();
+        var jobCancelled = new TaskCompletionSource<bool>();
         
         registry.ScheduleJob("* * * * *", async (sp, ct) =>
         {
             jobStarted.SetResult(true);
-            // Wait for cancellation
-            await Task.Delay(TimeSpan.FromMinutes(1), ct);
+            try
+            {
+                // Wait for cancellation
+                await Task.Delay(TimeSpan.FromMinutes(1), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                jobCancelled.SetResult(true);
+                throw; // Re-throw to test the handler
+            }
         });
         
         services.AddSingleton(registry);
@@ -828,25 +837,27 @@ public partial class MiniCronTests
         
         Assert.NotNull(runJobsMethod);
         
-        // Act - Start job execution and cancel it
+        // Act - Start job execution with a cancellation token
         using var cts = new CancellationTokenSource();
         var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
-        await task;
         
-        // Wait for job to start
+        // Wait for job to start before cancelling
         await jobStarted.Task;
         await Task.Delay(50); // Give job time to enter execution
         
-        // Cancel the job
+        // Cancel the token while job is running
         cts.Cancel();
         
-        // Wait for cancellation to be processed
-        await Task.Delay(100);
+        // Complete the RunJobs task
+        await task;
         
-        // Assert - The test validates that the code path executes without exceptions
+        // Wait for cancellation to be processed
+        var cancelledInTime = await Task.WhenAny(jobCancelled.Task, Task.Delay(1000)) == jobCancelled.Task;
+        
+        // Assert - Job should have been cancelled
         // The stopwatch should be stopped in the OperationCanceledException handler
         // and elapsed time should be logged (verified by no exceptions thrown)
-        Assert.True(true); // Job cancellation handled correctly
+        Assert.True(cancelledInTime, "Job should have been cancelled");
     }
 
     [Fact]
