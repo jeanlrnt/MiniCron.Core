@@ -24,11 +24,14 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
             }
 
             // If existing lock expired, try to replace it
-            if (_locks.TryGetValue(jobId, out var existingExpiry)
-                && existingExpiry <= now
-                && _locks.TryUpdate(jobId, expiry, existingExpiry))
+            if (_locks.TryGetValue(jobId, out var existingExpiry))
             {
-                return true;
+                var refreshedExpiry = DateTimeOffset.UtcNow.Add(ttl);
+                if (existingExpiry <= DateTimeOffset.UtcNow
+                    && _locks.TryUpdate(jobId, refreshedExpiry, existingExpiry))
+                {
+                    return true;
+                }
             }
 
             // Small backoff to avoid tight-looping
