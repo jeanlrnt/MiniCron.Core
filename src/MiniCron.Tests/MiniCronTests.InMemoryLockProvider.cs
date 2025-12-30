@@ -16,12 +16,12 @@ public partial class MiniCronTests
         var a1 = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
         Assert.True(a1);
 
-        // Immediate second acquire without waiting: use a short cancellation token so call returns quickly
-        using var cts = new CancellationTokenSource(100);
-        var a2 = await provider.TryAcquireAsync(jobId, ttl, cts.Token);
+        // Immediate second acquire while lock is still held should fail deterministically
+        var a2 = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
         Assert.False(a2);
 
         // Release should allow re-acquire
+        await provider.ReleaseAsync(jobId);
         await provider.ReleaseAsync(jobId);
         var a3 = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
         Assert.True(a3);
