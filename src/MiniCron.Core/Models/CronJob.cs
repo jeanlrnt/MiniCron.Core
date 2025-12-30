@@ -1,4 +1,4 @@
-﻿namespace MiniCron.Core.Models;
+namespace MiniCron.Core.Models;
 
 public record CronJob(string CronExpression, Func<IServiceProvider, CancellationToken, Task> Action, TimeSpan? Timeout = null)
 {
@@ -8,5 +8,4 @@ public record CronJob(string CronExpression, Func<IServiceProvider, Cancellation
     /// would otherwise be treated as equal due to record value-based equality.
     /// </summary>
     public Guid Id { get; } = Guid.NewGuid();
-
 }
