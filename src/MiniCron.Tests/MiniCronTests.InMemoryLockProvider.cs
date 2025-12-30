@@ -26,12 +26,14 @@ public partial class MiniCronTests
         var a3 = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
         Assert.True(a3);
 
-        // Acquire and wait for TTL to expire
+        // Acquire and wait for TTL to expire using a substantially larger delay than the TTL
         var jobId2 = Guid.NewGuid();
-        var a4 = await provider.TryAcquireAsync(jobId2, TimeSpan.FromMilliseconds(50), CancellationToken.None);
+        var ttlForJob2 = TimeSpan.FromMilliseconds(50);
+        var a4 = await provider.TryAcquireAsync(jobId2, ttlForJob2, CancellationToken.None);
         Assert.True(a4);
-        await Task.Delay(150, CancellationToken.None);
-        var a5 = await provider.TryAcquireAsync(jobId2, TimeSpan.FromMilliseconds(50), CancellationToken.None);
+        var delayAfterTtl = ttlForJob2 + TimeSpan.FromMilliseconds(500);
+        await Task.Delay(delayAfterTtl, CancellationToken.None);
+        var a5 = await provider.TryAcquireAsync(jobId2, ttlForJob2, CancellationToken.None);
         Assert.True(a5);
     }
 }
