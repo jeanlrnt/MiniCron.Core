@@ -57,7 +57,7 @@ jobs:
         
       - name: Collect code coverage
         run: |
-          dotnet test src/MiniCron.Tests/MiniCron.Tests.csproj -c Release --no-build --collect:"XPlat Code Coverage" --results-directory ./coverage
+          dotnet test src/MiniCron.Tests/MiniCron.Tests.csproj -c Release --collect:"XPlat Code Coverage" --results-directory ./coverage
 
       - name: Generate coverage report
         uses: danielpalme/ReportGenerator-GitHub-Action@5
