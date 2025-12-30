@@ -9,7 +9,7 @@ namespace MiniCron.Core.Services;
 public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
 {
     private readonly ConcurrentDictionary<Guid, DateTimeOffset> _locks = new();
-    private bool _disposed;
+    private volatile bool _disposed;
 
     public async Task<bool> TryAcquireAsync(Guid jobId, TimeSpan ttl, CancellationToken cancellationToken)
     {
