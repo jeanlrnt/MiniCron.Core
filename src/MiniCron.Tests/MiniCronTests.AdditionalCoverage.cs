@@ -686,6 +686,134 @@ public partial class MiniCronTests
     }
     
     [Fact]
+    public async Task MiniCronBackgroundService_BackwardsCompatibleConstructor_WithRegisteredServices_UsesThemFromDI()
+    {
+        var services = new ServiceCollection();
+        var registry = new JobRegistry();
+        var jobExecuted = false;
+        
+        registry.ScheduleJob("* * * * *", (sp, ct) =>
+        {
+            jobExecuted = true;
+            return Task.CompletedTask;
+        });
+        
+        // Register custom options with a specific configuration
+        var customOptions = new MiniCronOptions
+        {
+            MaxConcurrency = 5,
+            TimeZone = TimeZoneInfo.Utc,
+            Granularity = CronGranularity.Minute
+        };
+        services.AddSingleton<IOptions<MiniCronOptions>>(Options.Create(customOptions));
+        
+        // Register custom system clock
+        services.AddSingleton<ISystemClock>(new SystemClock());
+        
+        services.AddSingleton(registry);
+        services.AddLogging();
+        
+        var serviceProvider = services.BuildServiceProvider();
+        var logger = serviceProvider.GetRequiredService<ILogger<MiniCronBackgroundService>>();
+        
+        // Use backwards-compatible constructor - should resolve from DI
+        var backgroundService = new MiniCronBackgroundService(
+            registry,
+            serviceProvider,
+            logger);
+        
+        // Verify the service was created successfully
+        Assert.NotNull(backgroundService);
+        
+        // Use reflection to verify the options were used
+        var optionsField = typeof(MiniCronBackgroundService)
+            .GetField("_options", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(optionsField);
+        
+        var actualOptions = (MiniCronOptions)optionsField.GetValue(backgroundService)!;
+        Assert.NotNull(actualOptions);
+        Assert.Equal(5, actualOptions.MaxConcurrency);
+        Assert.Equal(TimeZoneInfo.Utc, actualOptions.TimeZone);
+        Assert.Equal(CronGranularity.Minute, actualOptions.Granularity);
+        
+        // Verify it can execute jobs
+        var runJobsMethod = typeof(MiniCronBackgroundService)
+            .GetMethod("RunJobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        
+        Assert.NotNull(runJobsMethod);
+        
+        using var cts = new CancellationTokenSource();
+        var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
+        await task;
+        
+        await Task.Delay(50);
+        Assert.True(jobExecuted);
+    }
+    
+    [Fact]
+    public async Task MiniCronBackgroundService_BackwardsCompatibleConstructor_WithoutRegisteredServices_CreatesFallbacks()
+    {
+        var services = new ServiceCollection();
+        var registry = new JobRegistry();
+        var jobExecuted = false;
+        
+        registry.ScheduleJob("* * * * *", (sp, ct) =>
+        {
+            jobExecuted = true;
+            return Task.CompletedTask;
+        });
+        
+        // Do NOT register IOptions or ISystemClock
+        services.AddSingleton(registry);
+        services.AddLogging();
+        
+        var serviceProvider = services.BuildServiceProvider();
+        var logger = serviceProvider.GetRequiredService<ILogger<MiniCronBackgroundService>>();
+        
+        // Use backwards-compatible constructor - should create fallback instances
+        var backgroundService = new MiniCronBackgroundService(
+            registry,
+            serviceProvider,
+            logger);
+        
+        // Verify the service was created successfully
+        Assert.NotNull(backgroundService);
+        
+        // Use reflection to verify default options were used
+        var optionsField = typeof(MiniCronBackgroundService)
+            .GetField("_options", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(optionsField);
+        
+        var actualOptions = (MiniCronOptions)optionsField.GetValue(backgroundService)!;
+        Assert.NotNull(actualOptions);
+        // Verify defaults from MiniCronOptions constructor
+        Assert.Equal(10, actualOptions.MaxConcurrency); // Default value
+        Assert.Equal(CronGranularity.Minute, actualOptions.Granularity); // Default value
+        
+        // Verify the clock was created
+        var clockField = typeof(MiniCronBackgroundService)
+            .GetField("_clock", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(clockField);
+        
+        var actualClock = clockField.GetValue(backgroundService);
+        Assert.NotNull(actualClock);
+        Assert.IsType<SystemClock>(actualClock);
+        
+        // Verify it can execute jobs
+        var runJobsMethod = typeof(MiniCronBackgroundService)
+            .GetMethod("RunJobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        
+        Assert.NotNull(runJobsMethod);
+        
+        using var cts = new CancellationTokenSource();
+        var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
+        await task;
+        
+        await Task.Delay(50);
+        Assert.True(jobExecuted);
+    }
+    
+    [Fact]
     public async Task MiniCronBackgroundService_RunJobs_WithJobHavingSpecificTimeout_UsesJobTimeout()
     {
         var services = new ServiceCollection();
