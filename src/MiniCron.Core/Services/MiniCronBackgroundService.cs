@@ -148,46 +148,40 @@ public class MiniCronBackgroundService : BackgroundService
                             var sw = System.Diagnostics.Stopwatch.StartNew();
                             _logger.LogInformation("Job started {JobId}", job.Id);
                             var semaphoreAcquired = false;
+                            var lockAcquired = false;
                             try
                             {
-                                // Acquire concurrency semaphore first to avoid holding lock while waiting
-                                await _concurrencySemaphore.WaitAsync(stoppingToken);
-                                semaphoreAcquired = true;
+                                // Attempt to acquire distributed lock first (TTL = job timeout or default)
+                                var ttl = job.Timeout ?? _options.DefaultJobTimeout ?? TimeSpan.FromMinutes(30);
+                                lockAcquired = await _lockProvider.TryAcquireAsync(job.Id, ttl, stoppingToken);
+
+                                if (!lockAcquired)
+                                {
+                                    _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
+                                    return;
+                                }
 
                                 try
                                 {
-                                    // Attempt to acquire distributed lock (TTL = job timeout or default)
-                                    var ttl = job.Timeout ?? _options.DefaultJobTimeout ?? TimeSpan.FromMinutes(30);
-                                    var acquired = await _lockProvider.TryAcquireAsync(job.Id, ttl, stoppingToken);
+                                    // Acquire concurrency semaphore after distributed lock
+                                    await _concurrencySemaphore.WaitAsync(stoppingToken);
+                                    semaphoreAcquired = true;
 
-                                    if (!acquired)
+                                    // Execute with timeout enforcement
+                                    var jobTimeout = job.Timeout ?? _options.DefaultJobTimeout;
+                                    if (jobTimeout.HasValue)
                                     {
-                                        _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
-                                        return;
+                                        using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                                        cts.CancelAfter(jobTimeout.Value);
+                                        await ExecuteJobScoped(job, cts.Token);
+                                    }
+                                    else
+                                    {
+                                        await ExecuteJobScoped(job, stoppingToken);
                                     }
 
-                                    try
-                                    {
-                                        // Execute with timeout enforcement
-                                        var jobTimeout = job.Timeout ?? _options.DefaultJobTimeout;
-                                        if (jobTimeout.HasValue)
-                                        {
-                                            using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-                                            cts.CancelAfter(jobTimeout.Value);
-                                            await ExecuteJobScoped(job, cts.Token);
-                                        }
-                                        else
-                                        {
-                                            await ExecuteJobScoped(job, stoppingToken);
-                                        }
-
-                                        sw.Stop();
-                                        _logger.LogInformation("Job completed {JobId} in {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
-                                    }
-                                    finally
-                                    {
-                                        await _lockProvider.ReleaseAsync(job.Id);
-                                    }
+                                    sw.Stop();
+                                    _logger.LogInformation("Job completed {JobId} in {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                                 }
                                 finally
                                 {
@@ -210,6 +204,11 @@ public class MiniCronBackgroundService : BackgroundService
                             }
                             finally
                             {
+                                // Release distributed lock if it was acquired
+                                if (lockAcquired)
+                                {
+                                    await _lockProvider.ReleaseAsync(job.Id);
+                                }
                                 // Ensure stopwatch is stopped
                                 if (sw.IsRunning)
                                 {
