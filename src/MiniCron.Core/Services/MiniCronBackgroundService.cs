@@ -216,6 +216,11 @@ public class MiniCronBackgroundService : BackgroundService
                                 sw.Stop();
                                 _logger.LogWarning("Job {JobId} cancelled after {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                             }
+                            catch (ObjectDisposedException)
+                            {
+                                // Service is being disposed, ignore this job execution
+                                sw.Stop();
+                            }
                             catch (Exception ex)
                             {
                                 sw.Stop();
