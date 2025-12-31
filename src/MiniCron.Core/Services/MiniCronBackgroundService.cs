@@ -207,7 +207,14 @@ public class MiniCronBackgroundService : BackgroundService
                                     // Release distributed lock only if it was acquired
                                     if (lockAcquired)
                                     {
-                                        await _lockProvider.ReleaseAsync(job.Id);
+                                        try
+                                        {
+                                            await _lockProvider.ReleaseAsync(job.Id);
+                                        }
+                                        catch (ObjectDisposedException)
+                                        {
+                                            // Service is being disposed, ignore
+                                        }
                                     }
                                 }
                             }
