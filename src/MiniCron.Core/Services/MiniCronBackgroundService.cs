@@ -162,23 +162,50 @@ public class MiniCronBackgroundService : BackgroundService
                                     return;
                                 }
 
+                                if (!lockAcquired)
+                                {
+                                    _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
+                                    return;
+                                }
+
                                 try
                                 {
-                                    // Acquire concurrency semaphore after distributed lock
+                                    // Acquire concurrency semaphore after getting the lock
                                     await _concurrencySemaphore.WaitAsync(stoppingToken);
                                     semaphoreAcquired = true;
 
-                                    // Execute with timeout enforcement
-                                    var jobTimeout = job.Timeout ?? _options.DefaultJobTimeout;
-                                    if (jobTimeout.HasValue)
+                                    try
                                     {
-                                        using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-                                        cts.CancelAfter(jobTimeout.Value);
-                                        await ExecuteJobScoped(job, cts.Token);
+                                        // Execute with timeout enforcement
+                                        var jobTimeout = job.Timeout ?? _options.DefaultJobTimeout;
+                                        if (jobTimeout.HasValue)
+                                        {
+                                            using var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                                            cts.CancelAfter(jobTimeout.Value);
+                                            await ExecuteJobScoped(job, cts.Token);
+                                        }
+                                        else
+                                        {
+                                            await ExecuteJobScoped(job, stoppingToken);
+                                        }
+
+                                        sw.Stop();
+                                        _logger.LogInformation("Job completed {JobId} in {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                                     }
-                                    else
+                                    finally
                                     {
-                                        await ExecuteJobScoped(job, stoppingToken);
+                                        // Release concurrency slot only if it was acquired
+                                        if (semaphoreAcquired)
+                                        {
+                                            try
+                                            {
+                                                _concurrencySemaphore.Release();
+                                            }
+                                            catch (ObjectDisposedException)
+                                            {
+                                                // Service is being disposed, ignore
+                                            }
+                                        }
                                     }
 
                                     sw.Stop();
@@ -186,10 +213,17 @@ public class MiniCronBackgroundService : BackgroundService
                                 }
                                 finally
                                 {
-                                    // Release concurrency slot only if it was acquired
-                                    if (semaphoreAcquired)
+                                    // Release distributed lock only if it was acquired
+                                    if (lockAcquired)
                                     {
-                                        _concurrencySemaphore.Release();
+                                        try
+                                        {
+                                            await _lockProvider.ReleaseAsync(job.Id);
+                                        }
+                                        catch (ObjectDisposedException)
+                                        {
+                                            // Service is being disposed, ignore
+                                        }
                                     }
                                 }
                             }
@@ -197,6 +231,11 @@ public class MiniCronBackgroundService : BackgroundService
                             {
                                 sw.Stop();
                                 _logger.LogWarning("Job {JobId} cancelled after {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
+                            }
+                            catch (ObjectDisposedException)
+                            {
+                                // Service is being disposed, ignore this job execution
+                                sw.Stop();
                             }
                             catch (Exception ex)
                             {

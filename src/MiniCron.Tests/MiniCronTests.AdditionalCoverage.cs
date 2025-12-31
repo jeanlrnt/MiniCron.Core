@@ -343,24 +343,34 @@ public partial class MiniCronTests
         services.AddSingleton<IHostedService, MiniCronBackgroundService>();
         services.AddLogging();
         
+        // Configure second-level granularity for faster test execution
+        services.Configure<MiniCronOptions>(options =>
+        {
+            options.Granularity = CronGranularity.Second;
+        });
+        services.AddSingleton<ISystemClock, SystemClock>();
+        
         var serviceProvider = services.BuildServiceProvider();
         var backgroundService = serviceProvider.GetServices<IHostedService>()
             .OfType<MiniCronBackgroundService>()
             .First();
         
-        var runJobsMethod = typeof(MiniCronBackgroundService)
-            .GetMethod("RunJobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        Assert.NotNull(runJobsMethod);
-        
-        using var cts = new CancellationTokenSource();
-        var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
-        await task;
-        
-        // Wait for async job execution
-        await Task.Delay(50);
-        
-        Assert.True(jobExecuted);
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            await backgroundService.StartAsync(cts.Token);
+            
+            // Wait for background service to initialize and execute the job
+            // Second granularity means it runs within 1-2 seconds
+            await Task.Delay(2500);
+            
+            Assert.True(jobExecuted);
+        }
+        finally
+        {
+            await backgroundService.StopAsync(CancellationToken.None);
+            await serviceProvider.DisposeAsync();
+        }
     }
     
     [Fact]
@@ -820,9 +830,9 @@ public partial class MiniCronTests
         var jobExecuted = false;
         var registry = new JobRegistry();
         
-        // Create a job that will have a specific timeout
-        // Note: CronJob.Timeout is currently read-only, so this test verifies the default timeout path
-        // Future enhancement: support job-specific timeouts via JobRegistry API
+        // Create a job that will run under the default timeout configured in MiniCronOptions
+        // Note: this test verifies the default timeout path rather than configuring a per-job timeout
+        // (job-specific timeouts are handled elsewhere and are not exercised by this test)
         registry.ScheduleJob("* * * * *", async (sp, ct) =>
         {
             jobExecuted = true;
