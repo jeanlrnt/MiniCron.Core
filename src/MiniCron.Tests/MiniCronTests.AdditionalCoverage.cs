@@ -489,9 +489,14 @@ public partial class MiniCronTests
         var services = new ServiceCollection();
         var registry = new JobRegistry();
         
-        // Manually add an invalid job (bypassing validation for testing error handling)
+        // Manually add an invalid job directly to the registry's internal dictionary (bypassing validation)
         var job = new CronJob("invalid cron", (sp, ct) => Task.CompletedTask);
-        Assert.NotNull(job);
+        var jobsField = typeof(JobRegistry).GetField("_jobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(jobsField);
+        
+        var jobs = jobsField.GetValue(registry) as Dictionary<Guid, CronJob>;
+        Assert.NotNull(jobs);
+        jobs.Add(job.Id, job);
         
         services.AddSingleton(registry);
         services.AddSingleton<IHostedService, MiniCronBackgroundService>();
@@ -510,8 +515,13 @@ public partial class MiniCronTests
         using var cts = new CancellationTokenSource();
         var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
         
-        // Should not throw even with invalid cron expression
+        // Should not throw even with invalid cron expression - the error should be caught and logged
         await task;
+        
+        // Verify that the invalid job is in the registry
+        var registeredJobs = registry.GetJobs();
+        Assert.Single(registeredJobs);
+        Assert.Equal("invalid cron", registeredJobs[0].CronExpression);
     }
     
     [Fact]
