@@ -831,22 +831,22 @@ public partial class MiniCronTests
     public async Task MiniCronBackgroundService_RunJobs_WithJobHavingSpecificTimeout_UsesJobTimeout()
     {
         var services = new ServiceCollection();
-        var jobExecuted = false;
-        var jobCancelled = false;
+        var jobStarted = new TaskCompletionSource<bool>();
+        var jobCancelled = new TaskCompletionSource<bool>();
         var registry = new JobRegistry();
         
         // Create a job with a specific timeout of 100ms
         // The job will attempt to run for 5 seconds, but should be cancelled by the job-specific timeout
         registry.ScheduleJob("* * * * *", async (sp, ct) =>
         {
-            jobExecuted = true;
+            jobStarted.SetResult(true);
             try
             {
                 await Task.Delay(5000, ct);
             }
             catch (OperationCanceledException)
             {
-                jobCancelled = true;
+                jobCancelled.SetResult(true);
                 throw;
             }
         }, TimeSpan.FromMilliseconds(100));
@@ -873,11 +873,12 @@ public partial class MiniCronTests
         var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
         await task;
         
-        // Wait for the job to execute and be cancelled
-        await Task.Delay(300);
+        // Wait for the job to start and be cancelled
+        await jobStarted.Task;
+        await jobCancelled.Task;
         
-        Assert.True(jobExecuted, "Job should have started executing");
-        Assert.True(jobCancelled, "Job should have been cancelled by job-specific timeout");
+        Assert.True(jobStarted.Task.IsCompletedSuccessfully, "Job should have started executing");
+        Assert.True(jobCancelled.Task.IsCompletedSuccessfully, "Job should have been cancelled by job-specific timeout");
     }
     
     [Fact]
