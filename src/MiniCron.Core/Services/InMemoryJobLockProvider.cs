@@ -79,7 +79,7 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
             }
 
             // Increase backoff delay with integer arithmetic (backoff * 3 / 2), capped at maxBackoffDelay
-            // Note: Integer division truncates (e.g., 11 * 3 / 2 = 16, not 16.5), providing consistent progression
+            // Note: Integer division truncates (e.g., 15 * 3 / 2 = 22, truncated from 22.5), providing consistent progression
             backoffDelay = Math.Min(backoffDelay * 3 / 2, maxBackoffDelay);
         }
 
@@ -102,14 +102,16 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
         _locks.TryRemove(jobId, out _);
         
         // Signal waiting threads that a lock has been released
-        // Use try-catch to handle the case where count is already at max
+        // Use try-catch because concurrent releases may cause SemaphoreFullException
+        // This is the correct pattern for signaling without race conditions
         try
         {
             _lockReleasedSignal.Release();
         }
         catch (SemaphoreFullException)
         {
-            // Already at max count, no action needed
+            // Already at max count (1), no action needed
+            // This can occur when multiple threads release locks concurrently
         }
         
         return Task.CompletedTask;

@@ -71,7 +71,14 @@ public class JobRegistry : IDisposable
         {
             _jobs.Add(job.Id, job);
             _logger?.LogInformation("Job added: {JobId} {Cron}", job.Id, job.CronExpression);
-            JobAdded?.Invoke(this, new JobEventArgs(job));
+            try
+            {
+                JobAdded?.Invoke(this, new JobEventArgs(job));
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Unhandled exception in JobAdded event handler for job {JobId}", job.Id);
+            }
             return job.Id;
         }
         finally
@@ -164,23 +171,24 @@ public class JobRegistry : IDisposable
         _lock.EnterWriteLock();
         try
         {
-            if (!_jobs.TryGetValue(jobId, out var job)) return false;
-            
-            var removed = _jobs.Remove(jobId);
-            if (removed)
+            var removed = _jobs.Remove(jobId, out var job);
+            if (!removed)
             {
-                _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, job.CronExpression);
-                try
-                {
-                    JobRemoved?.Invoke(this, new JobEventArgs(job));
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Unhandled exception in JobRemoved event handler for job {JobId} {Cron}", jobId, job.CronExpression);
-                }
+                return false;
             }
-            
-            return removed;
+
+            // At this point, job is guaranteed to be non-null because Remove returned true
+            _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, job!.CronExpression);
+            try
+            {
+                JobRemoved?.Invoke(this, new JobEventArgs(job!));
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Unhandled exception in JobRemoved event handler for job {JobId} {Cron}", jobId, job!.CronExpression);
+            }
+
+            return true;
         }
         finally
         {
@@ -216,7 +224,12 @@ public class JobRegistry : IDisposable
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Unhandled exception in JobUpdated event handler for job {JobId}", jobId);
+                _logger?.LogError(
+                    ex,
+                    "Unhandled exception in JobUpdated event handler for job {JobId} with cron change {OldCron} -> {NewCron}",
+                    jobId,
+                    existingJob.CronExpression,
+                    updatedJob.CronExpression);
             }
             
             return true;
