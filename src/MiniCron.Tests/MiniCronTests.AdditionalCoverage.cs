@@ -873,6 +873,9 @@ public partial class MiniCronTests
         var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
         await task;
         
+        // Allow time for the job to start and the job-specific timeout to trigger
+        await Task.Delay(200);
+        
         // Wait for the job to start and be cancelled
         await jobStarted.Task;
         await jobCancelled.Task;
