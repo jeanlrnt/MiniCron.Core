@@ -348,14 +348,8 @@ public partial class MiniCronTests
             .OfType<MiniCronBackgroundService>()
             .First();
         
-        var runJobsMethod = typeof(MiniCronBackgroundService)
-            .GetMethod("RunJobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        Assert.NotNull(runJobsMethod);
-        
         using var cts = new CancellationTokenSource();
-        var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
-        await task;
+        await backgroundService.StartAsync(cts.Token);
         
         // Wait for async job execution
         await Task.Delay(50);
