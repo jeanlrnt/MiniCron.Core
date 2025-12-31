@@ -101,6 +101,53 @@ public class JobRegistry : IDisposable
     }
 
     /// <summary>
+    /// Schedules a new job with the specified cron expression, action, and timeout.
+    /// </summary>
+    /// <param name="cronExpression">The cron expression defining when the job should run.</param>
+    /// <param name="action">The action to execute when the job is triggered.</param>
+    /// <param name="timeout">The maximum time allowed for the job to execute. If null, uses the default timeout.</param>
+    /// <returns>A unique identifier for the scheduled job.</returns>
+    public Guid ScheduleJob(string cronExpression, Func<IServiceProvider, CancellationToken, Task> action, TimeSpan? timeout)
+    {
+        CronHelper.ValidateCronExpression(cronExpression);
+
+        var job = new CronJob(cronExpression, action, timeout);
+
+        _lock.EnterWriteLock();
+        try
+        {
+            _jobs.Add(job.Id, job);
+            _logger?.LogInformation("Job added: {JobId} {Cron} Timeout: {Timeout}", job.Id, job.CronExpression, timeout);
+            JobAdded?.Invoke(this, new JobEventArgs(job));
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+        return job.Id;
+    }
+
+    /// <summary>
+    /// Ergonomic overload accepting a token-aware delegate with timeout.
+    /// </summary>
+    public Guid ScheduleJob(string cronExpression, Func<CancellationToken, Task> action, TimeSpan? timeout)
+    {
+        return ScheduleJob(cronExpression, (_, ct) => action(ct), timeout);
+    }
+
+    /// <summary>
+    /// Ergonomic overload accepting a simple synchronous action with timeout.
+    /// </summary>
+    public Guid ScheduleJob(string cronExpression, Action action, TimeSpan? timeout)
+    {
+        return ScheduleJob(cronExpression, (_, _) =>
+        {
+            action(); 
+            return Task.CompletedTask;
+        }, timeout);
+    }
+
+    /// <summary>
     /// Removes a scheduled job by its unique identifier.
     /// </summary>
     /// <param name="jobId">The unique identifier of the job to remove.</param>
