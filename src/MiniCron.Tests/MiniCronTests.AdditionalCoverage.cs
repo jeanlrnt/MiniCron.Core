@@ -843,12 +843,67 @@ public partial class MiniCronTests
     public async Task MiniCronBackgroundService_RunJobs_WithJobHavingSpecificTimeout_UsesJobTimeout()
     {
         var services = new ServiceCollection();
+        var jobStarted = new TaskCompletionSource<bool>();
+        var jobCancelled = new TaskCompletionSource<bool>();
+        var registry = new JobRegistry();
+        
+        // Create a job with a specific timeout of 100ms
+        // The job will attempt to run for 5 seconds, but should be cancelled by the job-specific timeout
+        registry.ScheduleJob("* * * * *", async (sp, ct) =>
+        {
+            jobStarted.SetResult(true);
+            try
+            {
+                await Task.Delay(5000, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                jobCancelled.SetResult(true);
+                throw;
+            }
+        }, TimeSpan.FromMilliseconds(100));
+        
+        services.AddSingleton(registry);
+        services.AddSingleton<IHostedService, MiniCronBackgroundService>();
+        services.AddLogging();
+        services.AddSingleton<IOptions<MiniCronOptions>>(Options.Create(new MiniCronOptions
+        {
+            DefaultJobTimeout = TimeSpan.FromSeconds(30) // Much longer than job-specific timeout
+        }));
+        
+        var serviceProvider = services.BuildServiceProvider();
+        var backgroundService = serviceProvider.GetServices<IHostedService>()
+            .OfType<MiniCronBackgroundService>()
+            .First();
+        
+        var runJobsMethod = typeof(MiniCronBackgroundService)
+            .GetMethod("RunJobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        
+        Assert.NotNull(runJobsMethod);
+        
+        using var cts = new CancellationTokenSource();
+        var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
+        await task;
+        
+        // Allow time for the job to start and the job-specific timeout to trigger
+        await Task.Delay(200);
+        
+        // Wait for the job to start and be cancelled
+        await jobStarted.Task;
+        await jobCancelled.Task;
+        
+        Assert.True(jobStarted.Task.IsCompletedSuccessfully, "Job should have started executing");
+        Assert.True(jobCancelled.Task.IsCompletedSuccessfully, "Job should have been cancelled by job-specific timeout");
+    }
+    
+    [Fact]
+    public async Task MiniCronBackgroundService_RunJobs_WithDefaultTimeout_UsesDefaultTimeout()
+    {
+        var services = new ServiceCollection();
         var jobExecuted = false;
         var registry = new JobRegistry();
         
-        // Create a job that will run under the default timeout configured in MiniCronOptions
-        // Note: this test verifies the default timeout path rather than configuring a per-job timeout
-        // (job-specific timeouts are handled elsewhere and are not exercised by this test)
+        // Create a job without a specific timeout, should use the default timeout from MiniCronOptions
         registry.ScheduleJob("* * * * *", async (sp, ct) =>
         {
             jobExecuted = true;
