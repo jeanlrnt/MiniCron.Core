@@ -162,12 +162,6 @@ public class MiniCronBackgroundService : BackgroundService
                                     return;
                                 }
 
-                                if (!lockAcquired)
-                                {
-                                    _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
-                                    return;
-                                }
-
                                 try
                                 {
                                     // Acquire concurrency semaphore after getting the lock
@@ -207,9 +201,6 @@ public class MiniCronBackgroundService : BackgroundService
                                             }
                                         }
                                     }
-
-                                    sw.Stop();
-                                    _logger.LogInformation("Job completed {JobId} in {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                                 }
                                 finally
                                 {
@@ -244,11 +235,6 @@ public class MiniCronBackgroundService : BackgroundService
                             }
                             finally
                             {
-                                // Release distributed lock if it was acquired
-                                if (lockAcquired)
-                                {
-                                    await _lockProvider.ReleaseAsync(job.Id);
-                                }
                                 // Ensure stopwatch is stopped
                                 if (sw.IsRunning)
                                 {
@@ -290,6 +276,7 @@ public class MiniCronBackgroundService : BackgroundService
 
     public override void Dispose()
     {
+        base.Dispose();
 
         if (_ownsLockProvider && _lockProvider is IDisposable disposable)
         {
