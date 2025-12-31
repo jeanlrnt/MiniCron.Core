@@ -18,7 +18,7 @@ public partial class MiniCronTests
         var actual = clock.UtcNow;
         var after = DateTime.UtcNow;
         
-        Assert.True(actual >= before && actual <= after.AddMilliseconds(200));
+        Assert.True(actual >= before && actual <= after.AddMilliseconds(50));
     }
     
     [Fact]
@@ -29,7 +29,7 @@ public partial class MiniCronTests
         var actual = clock.Now(TimeZoneInfo.Utc);
         var after = DateTime.UtcNow;
         
-        Assert.True(actual >= before && actual <= after.AddMilliseconds(200));
+        Assert.True(actual >= before && actual <= after.AddMilliseconds(50));
     }
     
     [Fact]

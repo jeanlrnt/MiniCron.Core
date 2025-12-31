@@ -46,7 +46,7 @@ public partial class MiniCronTests
         var after = DateTime.UtcNow;
 
         // actual should be between before and after (tolerance for small delays)
-        Assert.True(actual >= before && actual <= after.AddMilliseconds(200));
+        Assert.True(actual >= before && actual <= after.AddMilliseconds(50));
     }
 
     [Fact]
