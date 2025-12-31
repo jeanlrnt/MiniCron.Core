@@ -165,6 +165,8 @@ public class MiniCronBackgroundService : BackgroundService
                                 try
                                 {
                                     // Acquire concurrency semaphore after getting the lock
+                                    // Note: If WaitAsync throws (e.g., ObjectDisposedException), semaphoreAcquired remains false,
+                                    // and the exception is caught by outer catch blocks. The finally block will skip release.
                                     await _concurrencySemaphore.WaitAsync(stoppingToken);
                                     semaphoreAcquired = true;
 
