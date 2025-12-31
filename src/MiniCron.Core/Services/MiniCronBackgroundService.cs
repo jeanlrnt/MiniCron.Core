@@ -191,7 +191,14 @@ public class MiniCronBackgroundService : BackgroundService
                                         // Release concurrency slot only if it was acquired
                                         if (semaphoreAcquired)
                                         {
-                                            _concurrencySemaphore.Release();
+                                            try
+                                            {
+                                                _concurrencySemaphore.Release();
+                                            }
+                                            catch (ObjectDisposedException)
+                                            {
+                                                // Service is being disposed, ignore
+                                            }
                                         }
                                     }
                                 }
