@@ -719,7 +719,7 @@ public partial class MiniCronTests
         var startTask = backgroundService.StartAsync(cts.Token);
         
         // Wait for job execution with timeout
-        var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(5000));
+        await Task.WhenAny(tcs.Task, Task.Delay(5000));
         
         // Cancel and stop the service
         cts.Cancel();

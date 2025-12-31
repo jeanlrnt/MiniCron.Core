@@ -79,6 +79,7 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
             }
 
             // Increase backoff delay with integer arithmetic (backoff * 3 / 2), capped at maxBackoffDelay
+            // Note: Integer division truncates (e.g., 11 * 3 / 2 = 16, not 16.5), providing consistent progression
             backoffDelay = Math.Min(backoffDelay * 3 / 2, maxBackoffDelay);
         }
 
