@@ -168,6 +168,8 @@ You can bind scheduler-level options from configuration using the Options patter
 }
 ```
 
+> **Note:** The `Granularity` enum can be specified as a string (`"Minute"` or `"Second"`) or as a numeric value (`0` for Minute, `1` for Second). .NET's configuration binder automatically converts string enum values to their corresponding enum members.
+
 **Program.cs**
 ```csharp
 var builder = WebApplication.CreateBuilder(args);

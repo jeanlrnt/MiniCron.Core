@@ -334,12 +334,12 @@ public partial class MiniCronTests
     public async Task MiniCronBackgroundService_RunJobs_ExecutesMatchingJobs()
     {
         var services = new ServiceCollection();
-        var jobExecuted = false;
+        var tcs = new TaskCompletionSource<bool>();
         var registry = new JobRegistry();
         
         registry.ScheduleJob("* * * * *", (sp, ct) =>
         {
-            jobExecuted = true;
+            tcs.TrySetResult(true);
             return Task.CompletedTask;
         });
         
@@ -361,12 +361,11 @@ public partial class MiniCronTests
         
         try
         {
-            using var cts = new CancellationTokenSource();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await backgroundService.StartAsync(cts.Token);
             
-            // Wait for background service to initialize and execute the job
-            // Second granularity means it runs within 1-2 seconds
-            await Task.Delay(2500);
+            // Wait for job to signal completion (with timeout)
+            var jobExecuted = await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
             
             Assert.True(jobExecuted);
         }
@@ -450,12 +449,12 @@ public partial class MiniCronTests
     public async Task MiniCronBackgroundService_RunJobs_WithException_ContinuesExecution()
     {
         var services = new ServiceCollection();
-        var jobExecuted = false;
+        var tcs = new TaskCompletionSource<bool>();
         var registry = new JobRegistry();
         
         registry.ScheduleJob("* * * * *", (sp, ct) =>
         {
-            jobExecuted = true;
+            tcs.TrySetResult(true);
             throw new InvalidOperationException("Test exception");
         });
         
@@ -477,8 +476,8 @@ public partial class MiniCronTests
         var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
         await task;
         
-        // Wait for async job execution
-        await Task.Delay(50);
+        // Wait for job execution with timeout
+        var jobExecuted = await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(500));
         
         Assert.True(jobExecuted);
     }
@@ -635,11 +634,11 @@ public partial class MiniCronTests
     {
         var services = new ServiceCollection();
         var registry = new JobRegistry();
-        var jobExecuted = false;
+        var tcs = new TaskCompletionSource<bool>();
         
         registry.ScheduleJob("* * * * *", (sp, ct) =>
         {
-            jobExecuted = true;
+            tcs.TrySetResult(true);
             return Task.CompletedTask;
         });
         
@@ -664,7 +663,8 @@ public partial class MiniCronTests
         var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
         await task;
         
-        await Task.Delay(50);
+        // Wait for job execution with timeout
+        var jobExecuted = await tcs.Task.WaitAsync(TimeSpan.FromMilliseconds(500));
         Assert.True(jobExecuted);
     }
     
