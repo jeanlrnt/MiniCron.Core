@@ -72,12 +72,12 @@ public class JobRegistry : IDisposable
             _jobs.Add(job.Id, job);
             _logger?.LogInformation("Job added: {JobId} {Cron}", job.Id, job.CronExpression);
             JobAdded?.Invoke(this, new JobEventArgs(job));
+            return job.Id;
         }
         finally
         {
             _lock.ExitWriteLock();
         }
-        return job.Id;
     }
 
     /// <summary>
