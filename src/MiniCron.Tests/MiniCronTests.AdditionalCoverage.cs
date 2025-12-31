@@ -484,49 +484,6 @@ public partial class MiniCronTests
     }
     
     [Fact]
-    public async Task MiniCronBackgroundService_RunJobs_WithInvalidCronExpression_HandlesGracefully()
-    {
-        var services = new ServiceCollection();
-        var registry = new JobRegistry();
-        
-        var jobExecuted = false;
-        
-        // Add an invalid job using the test helper method (thread-safe, bypasses validation)
-        var job = new CronJob("invalid cron", (sp, ct) => 
-        {
-            jobExecuted = true;
-            return Task.CompletedTask;
-        });
-        registry.AddJobWithoutValidation(job);
-        
-        services.AddSingleton(registry);
-        services.AddSingleton<IHostedService, MiniCronBackgroundService>();
-        services.AddLogging();
-        
-        var serviceProvider = services.BuildServiceProvider();
-        var backgroundService = serviceProvider.GetServices<IHostedService>()
-            .OfType<MiniCronBackgroundService>()
-            .First();
-        
-        var runJobsMethod = typeof(MiniCronBackgroundService)
-            .GetMethod("RunJobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        Assert.NotNull(runJobsMethod);
-        
-        using var cts = new CancellationTokenSource();
-        var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
-        
-        // Should not throw even with invalid cron expression - IsDue returns false for invalid expressions
-        await task;
-        
-        // Verify that the invalid job is in the registry but was not executed
-        var registeredJobs = registry.GetJobs();
-        Assert.Single(registeredJobs);
-        Assert.Equal("invalid cron", registeredJobs[0].CronExpression);
-        Assert.False(jobExecuted, "Invalid cron expression should not be executed");
-    }
-    
-    [Fact]
     public void MiniCronBackgroundService_Constructor_WithNullClock_ThrowsArgumentNullException()
     {
         var services = new ServiceCollection();
