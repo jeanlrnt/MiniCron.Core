@@ -16,6 +16,10 @@ public class JobRegistry : IDisposable
     /// <remarks>
     /// This event is raised inside the write lock, ensuring event handlers observe consistent registry state.
     /// Event handlers should be lightweight to avoid blocking other registry operations.
+    /// <para>
+    /// <strong>Warning:</strong> Event handlers must not call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob),
+    /// as this will cause a deadlock. Handle registry modifications asynchronously or queue them for later execution if needed.
+    /// </para>
     /// </remarks>
     public event EventHandler<JobEventArgs>? JobAdded;
     
@@ -25,6 +29,10 @@ public class JobRegistry : IDisposable
     /// <remarks>
     /// This event is raised inside the write lock, ensuring event handlers observe consistent registry state.
     /// Event handlers should be lightweight to avoid blocking other registry operations.
+    /// <para>
+    /// <strong>Warning:</strong> Event handlers must not call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob),
+    /// as this will cause a deadlock. Handle registry modifications asynchronously or queue them for later execution if needed.
+    /// </para>
     /// </remarks>
     public event EventHandler<JobEventArgs>? JobRemoved;
     
@@ -34,6 +42,10 @@ public class JobRegistry : IDisposable
     /// <remarks>
     /// This event is raised inside the write lock, ensuring event handlers observe consistent registry state.
     /// Event handlers should be lightweight to avoid blocking other registry operations.
+    /// <para>
+    /// <strong>Warning:</strong> Event handlers must not call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob),
+    /// as this will cause a deadlock. Handle registry modifications asynchronously or queue them for later execution if needed.
+    /// </para>
     /// </remarks>
     public event EventHandler<JobEventArgs>? JobUpdated;
 
