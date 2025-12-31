@@ -148,23 +148,31 @@ public class MiniCronBackgroundService : BackgroundService
                             var sw = System.Diagnostics.Stopwatch.StartNew();
                             _logger.LogInformation("Job started {JobId}", job.Id);
                             var semaphoreAcquired = false;
+                            var lockAcquired = false;
                             try
                             {
-                                // Acquire concurrency semaphore first to avoid holding lock while waiting
-                                await _concurrencySemaphore.WaitAsync(stoppingToken);
-                                semaphoreAcquired = true;
+                                // Attempt to acquire distributed lock first (TTL = job timeout or default)
+                                var ttl = job.Timeout ?? _options.DefaultJobTimeout ?? TimeSpan.FromMinutes(30);
+                                lockAcquired = await _lockProvider.TryAcquireAsync(job.Id, ttl, stoppingToken);
+
+                                if (!lockAcquired)
+                                {
+                                    _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
+                                    _runningJobs.TryRemove(job.Id, out _);
+                                    return;
+                                }
+
+                                if (!lockAcquired)
+                                {
+                                    _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
+                                    return;
+                                }
 
                                 try
                                 {
-                                    // Attempt to acquire distributed lock (TTL = job timeout or default)
-                                    var ttl = job.Timeout ?? _options.DefaultJobTimeout ?? TimeSpan.FromMinutes(30);
-                                    var acquired = await _lockProvider.TryAcquireAsync(job.Id, ttl, stoppingToken);
-
-                                    if (!acquired)
-                                    {
-                                        _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
-                                        return;
-                                    }
+                                    // Acquire concurrency semaphore after getting the lock
+                                    await _concurrencySemaphore.WaitAsync(stoppingToken);
+                                    semaphoreAcquired = true;
 
                                     try
                                     {
@@ -186,15 +194,36 @@ public class MiniCronBackgroundService : BackgroundService
                                     }
                                     finally
                                     {
-                                        await _lockProvider.ReleaseAsync(job.Id);
+                                        // Release concurrency slot only if it was acquired
+                                        if (semaphoreAcquired)
+                                        {
+                                            try
+                                            {
+                                                _concurrencySemaphore.Release();
+                                            }
+                                            catch (ObjectDisposedException)
+                                            {
+                                                // Service is being disposed, ignore
+                                            }
+                                        }
                                     }
+
+                                    sw.Stop();
+                                    _logger.LogInformation("Job completed {JobId} in {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                                 }
                                 finally
                                 {
-                                    // Release concurrency slot only if it was acquired
-                                    if (semaphoreAcquired)
+                                    // Release distributed lock only if it was acquired
+                                    if (lockAcquired)
                                     {
-                                        _concurrencySemaphore.Release();
+                                        try
+                                        {
+                                            await _lockProvider.ReleaseAsync(job.Id);
+                                        }
+                                        catch (ObjectDisposedException)
+                                        {
+                                            // Service is being disposed, ignore
+                                        }
                                     }
                                 }
                             }
@@ -203,6 +232,11 @@ public class MiniCronBackgroundService : BackgroundService
                                 sw.Stop();
                                 _logger.LogWarning("Job {JobId} cancelled after {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                             }
+                            catch (ObjectDisposedException)
+                            {
+                                // Service is being disposed, ignore this job execution
+                                sw.Stop();
+                            }
                             catch (Exception ex)
                             {
                                 sw.Stop();
@@ -210,6 +244,11 @@ public class MiniCronBackgroundService : BackgroundService
                             }
                             finally
                             {
+                                // Release distributed lock if it was acquired
+                                if (lockAcquired)
+                                {
+                                    await _lockProvider.ReleaseAsync(job.Id);
+                                }
                                 // Ensure stopwatch is stopped
                                 if (sw.IsRunning)
                                 {

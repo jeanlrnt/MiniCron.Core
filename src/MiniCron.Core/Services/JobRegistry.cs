@@ -7,16 +7,19 @@ namespace MiniCron.Core.Services;
 public class JobRegistry : IDisposable
 {
     private readonly Dictionary<Guid, CronJob> _jobs = new();
-    private readonly ReaderWriterLockSlim _lock = new();
+    private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.SupportsRecursion);
     private readonly ILogger<JobRegistry>? _logger;
 
     /// <summary>
     /// Occurs when a job is added to the registry.
     /// </summary>
     /// <remarks>
-    /// This event is raised outside the write lock after the job has been added to the registry.
-    /// Event handlers may observe a registry state that has changed since the event was triggered,
-    /// as other operations can modify the registry between the event being raised and the handler executing.
+    /// This event is raised inside the write lock, ensuring event handlers observe consistent registry state.
+    /// Event handlers should be lightweight to avoid blocking other registry operations.
+    /// <para>
+    /// <strong>Note:</strong> Event handlers may call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob)
+    /// as the lock supports recursion. However, this should be done judiciously to avoid performance degradation.
+    /// </para>
     /// </remarks>
     public event EventHandler<JobEventArgs>? JobAdded;
     
@@ -24,9 +27,12 @@ public class JobRegistry : IDisposable
     /// Occurs when a job is removed from the registry.
     /// </summary>
     /// <remarks>
-    /// This event is raised outside the write lock after the job has been removed from the registry.
-    /// Event handlers may observe a registry state that has changed since the event was triggered,
-    /// as other operations can modify the registry between the event being raised and the handler executing.
+    /// This event is raised inside the write lock, ensuring event handlers observe consistent registry state.
+    /// Event handlers should be lightweight to avoid blocking other registry operations.
+    /// <para>
+    /// <strong>Note:</strong> Event handlers may call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob)
+    /// as the lock supports recursion. However, this should be done judiciously to avoid performance degradation.
+    /// </para>
     /// </remarks>
     public event EventHandler<JobEventArgs>? JobRemoved;
     
@@ -34,9 +40,12 @@ public class JobRegistry : IDisposable
     /// Occurs when a job's schedule is updated in the registry.
     /// </summary>
     /// <remarks>
-    /// This event is raised outside the write lock after the job has been updated in the registry.
-    /// Event handlers may observe a registry state that has changed since the event was triggered,
-    /// as other operations can modify the registry between the event being raised and the handler executing.
+    /// This event is raised inside the write lock, ensuring event handlers observe consistent registry state.
+    /// Event handlers should be lightweight to avoid blocking other registry operations.
+    /// <para>
+    /// <strong>Note:</strong> Event handlers may call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob)
+    /// as the lock supports recursion. However, this should be done judiciously to avoid performance degradation.
+    /// </para>
     /// </remarks>
     public event EventHandler<JobEventArgs>? JobUpdated;
 
@@ -98,32 +107,24 @@ public class JobRegistry : IDisposable
     /// <returns>True if the job was found and removed; otherwise, false.</returns>
     public bool RemoveJob(Guid jobId)
     {
-        CronJob? removedJob = null;
-        bool removed;
-        
         _lock.EnterWriteLock();
         try
         {
             if (!_jobs.TryGetValue(jobId, out var job)) return false;
             
-            removed = _jobs.Remove(jobId);
+            var removed = _jobs.Remove(jobId);
             if (removed)
             {
-                removedJob = job;
+                _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, job.CronExpression);
+                JobRemoved?.Invoke(this, new JobEventArgs(job));
             }
+            
+            return removed;
         }
         finally
         {
             _lock.ExitWriteLock();
         }
-
-        if (removed)
-        {
-            _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, removedJob!.CronExpression);
-            JobRemoved?.Invoke(this, new JobEventArgs(removedJob!));
-        }
-        
-        return removed;
     }
 
     /// <summary>
@@ -136,35 +137,26 @@ public class JobRegistry : IDisposable
     {
         CronHelper.ValidateCronExpression(newCronExpression);
 
-        CronJob? existingJob = null;
-        CronJob? updatedJob = null;
-        bool updated;
-        
         _lock.EnterWriteLock();
         try
         {
-            if (!_jobs.TryGetValue(jobId, out var job))
+            if (!_jobs.TryGetValue(jobId, out var existingJob))
             {
                 return false;
             }
             
-            existingJob = job;
-            updatedJob = existingJob with { CronExpression = newCronExpression };
+            var updatedJob = existingJob with { CronExpression = newCronExpression };
             _jobs[jobId] = updatedJob;
-            updated = true;
+            
+            _logger?.LogInformation("Job updated: {JobId} {OldCron} -> {NewCron}", jobId, existingJob.CronExpression, newCronExpression);
+            JobUpdated?.Invoke(this, new JobEventArgs(updatedJob, existingJob));
+            
+            return true;
         }
         finally
         {
             _lock.ExitWriteLock();
         }
-
-        if (updated)
-        {
-            _logger?.LogInformation("Job updated: {JobId} {OldCron} -> {NewCron}", jobId, existingJob!.CronExpression, newCronExpression);
-            JobUpdated?.Invoke(this, new JobEventArgs(updatedJob!, existingJob!));
-        }
-
-        return updated;
     }
 
     /// <summary>
