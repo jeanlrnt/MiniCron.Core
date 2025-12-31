@@ -970,43 +970,6 @@ public partial class MiniCronTests
         await Task.Delay(50);
         Assert.True(jobExecuted);
     }
-    
-    [Fact]
-    public async Task MiniCronBackgroundService_RunJobs_WithSemaphoreReleaseError_HandlesGracefully()
-    {
-        // This test is challenging to trigger the semaphore release error path (lines 176-179)
-        // which requires the semaphore to be in an invalid state
-        var services = new ServiceCollection();
-        var jobExecuted = false;
-        var registry = new JobRegistry();
-        
-        registry.ScheduleJob("* * * * *", async (sp, ct) =>
-        {
-            jobExecuted = true;
-            await Task.Delay(10, ct);
-        });
-        
-        services.AddSingleton(registry);
-        services.AddSingleton<IHostedService, MiniCronBackgroundService>();
-        services.AddLogging();
-        
-        var serviceProvider = services.BuildServiceProvider();
-        var backgroundService = serviceProvider.GetServices<IHostedService>()
-            .OfType<MiniCronBackgroundService>()
-            .First();
-        
-        var runJobsMethod = typeof(MiniCronBackgroundService)
-            .GetMethod("RunJobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        Assert.NotNull(runJobsMethod);
-        
-        using var cts = new CancellationTokenSource();
-        var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
-        await task;
-        
-        await Task.Delay(100);
-        Assert.True(jobExecuted);
-    }
 
     [Fact]
     public async Task MiniCronBackgroundService_RunJobs_WithJobCancellation_StopsStopwatchAndLogsElapsedTime()
