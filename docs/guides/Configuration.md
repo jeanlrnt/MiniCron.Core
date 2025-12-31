@@ -151,6 +151,66 @@ var app = builder.Build();
 app.Run();
 ```
 
+### Binding `MiniCronOptions` from appsettings.json
+
+You can bind scheduler-level options from configuration using the Options pattern. Note: `TimeZoneInfo` is not bound automatically from a string, so we demonstrate storing a timezone identifier and applying it in `PostConfigure`.
+
+**appsettings.json**
+```json
+{
+    "MiniCron": {
+        "TimeZone": "UTC",
+        "Granularity": "Minute",
+        "MaxConcurrency": 5,
+        "DefaultJobTimeout": "00:02:00",
+        "WaitForJobsOnShutdown": true
+    }
+}
+```
+
+> **Note:** The `Granularity` enum can be specified as a string (`"Minute"` or `"Second"`) or as a numeric value (`0` for Minute, `1` for Second). .NET's configuration binder automatically converts string enum values to their corresponding enum members.
+
+**Program.cs**
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+
+// Bind MiniCronOptions from configuration
+builder.Services.Configure<MiniCronOptions>(builder.Configuration.GetSection("MiniCron"));
+
+// TimeZone requires conversion from string to TimeZoneInfo
+builder.Services.PostConfigure<MiniCronOptions>(opts =>
+{
+    var tzId = builder.Configuration["MiniCron:TimeZone"];
+    if (!string.IsNullOrEmpty(tzId))
+    {
+        try
+        {
+            opts.TimeZone = TimeZoneInfo.FindSystemTimeZoneById(tzId);
+        }
+        catch (TimeZoneNotFoundException ex)
+        {
+            // Early-stage configuration error: use Console.Error intentionally here because the logging system may not be initialized yet.
+            System.Console.Error.WriteLine($"MiniCron configuration error: invalid time zone '{tzId}'. Falling back to UTC. {ex}");
+            opts.TimeZone = TimeZoneInfo.Utc;
+        }
+        catch (InvalidTimeZoneException ex)
+        {
+            // Early-stage configuration error: use Console.Error intentionally here because the logging system may not be initialized yet.
+            System.Console.Error.WriteLine($"MiniCron configuration error: invalid time zone data for '{tzId}'. Falling back to UTC. {ex}");
+            opts.TimeZone = TimeZoneInfo.Utc;
+        }
+    }
+});
+
+// Register MiniCron services (uses configured options)
+builder.Services.AddMiniCronOptions();
+
+var app = builder.Build();
+app.Run();
+```
+
+After binding, scheduled jobs can resolve `IOptions<MiniCronOptions>` from `IServiceProvider` if they need to read runtime settings.
+
 ### Environment Variables
 
 Use environment variables for sensitive or environment-specific configurations:

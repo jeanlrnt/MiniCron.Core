@@ -1,6 +1,6 @@
-﻿namespace MiniCron.Core.Models;
+namespace MiniCron.Core.Models;
 
-public record CronJob(string CronExpression, Func<IServiceProvider, CancellationToken, Task> Action)
+public record CronJob(string CronExpression, Func<IServiceProvider, CancellationToken, Task> Action, TimeSpan? Timeout = null)
 {
     /// <summary>
     /// Unique identifier for this job instance to ensure proper dictionary key uniqueness.
