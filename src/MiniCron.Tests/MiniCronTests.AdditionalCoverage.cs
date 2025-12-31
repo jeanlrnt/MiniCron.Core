@@ -78,6 +78,10 @@ public partial class MiniCronTests
         // After dispose, attempting to acquire should throw ObjectDisposedException
         await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
             await provider.TryAcquireAsync(jobId, TimeSpan.FromMinutes(1), CancellationToken.None));
+        
+        // After dispose, attempting to release should also throw ObjectDisposedException
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
+            await provider.ReleaseAsync(jobId));
     }
     
     [Fact]
