@@ -216,7 +216,7 @@ public class JobRegistry : IDisposable
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error while handling JobUpdated event for job {JobId}", jobId);
+                _logger?.LogError(ex, "Unhandled exception in JobUpdated event handler for job {JobId}", jobId);
             }
             
             return true;
