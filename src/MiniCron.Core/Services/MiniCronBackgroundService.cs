@@ -158,6 +158,7 @@ public class MiniCronBackgroundService : BackgroundService
                                 if (!lockAcquired)
                                 {
                                     _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
+                                    _runningJobs.TryRemove(job.Id, out _);
                                     return;
                                 }
 
