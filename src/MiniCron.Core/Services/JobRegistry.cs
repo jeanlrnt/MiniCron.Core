@@ -192,6 +192,26 @@ public class JobRegistry : IDisposable
         }
     }
 
+    /// <summary>
+    /// Adds a job to the registry without validation. For testing purposes only.
+    /// This method bypasses cron expression validation to allow testing error handling paths.
+    /// </summary>
+    /// <param name="job">The job to add to the registry.</param>
+    internal void AddJobWithoutValidation(CronJob job)
+    {
+        _lock.EnterWriteLock();
+        try
+        {
+            _jobs.Add(job.Id, job);
+            _logger?.LogInformation("Job added (without validation): {JobId} {Cron}", job.Id, job.CronExpression);
+            JobAdded?.Invoke(this, new JobEventArgs(job));
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+    }
+
     public void Dispose()
     {
         _lock.Dispose();

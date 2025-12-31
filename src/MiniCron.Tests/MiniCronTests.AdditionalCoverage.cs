@@ -484,19 +484,20 @@ public partial class MiniCronTests
     }
     
     [Fact]
-    public async Task MiniCronBackgroundService_RunJobs_WithInvalidCronExpression_LogsError()
+    public async Task MiniCronBackgroundService_RunJobs_WithInvalidCronExpression_HandlesGracefully()
     {
         var services = new ServiceCollection();
         var registry = new JobRegistry();
         
-        // Manually add an invalid job directly to the registry's internal dictionary (bypassing validation)
-        var job = new CronJob("invalid cron", (sp, ct) => Task.CompletedTask);
-        var jobsField = typeof(JobRegistry).GetField("_jobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        Assert.NotNull(jobsField);
+        var jobExecuted = false;
         
-        var jobs = jobsField.GetValue(registry) as Dictionary<Guid, CronJob>;
-        Assert.NotNull(jobs);
-        jobs.Add(job.Id, job);
+        // Add an invalid job using the test helper method (thread-safe, bypasses validation)
+        var job = new CronJob("invalid cron", (sp, ct) => 
+        {
+            jobExecuted = true;
+            return Task.CompletedTask;
+        });
+        registry.AddJobWithoutValidation(job);
         
         services.AddSingleton(registry);
         services.AddSingleton<IHostedService, MiniCronBackgroundService>();
@@ -515,13 +516,14 @@ public partial class MiniCronTests
         using var cts = new CancellationTokenSource();
         var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
         
-        // Should not throw even with invalid cron expression - the error should be caught and logged
+        // Should not throw even with invalid cron expression - IsDue returns false for invalid expressions
         await task;
         
-        // Verify that the invalid job is in the registry
+        // Verify that the invalid job is in the registry but was not executed
         var registeredJobs = registry.GetJobs();
         Assert.Single(registeredJobs);
         Assert.Equal("invalid cron", registeredJobs[0].CronExpression);
+        Assert.False(jobExecuted, "Invalid cron expression should not be executed");
     }
     
     [Fact]
