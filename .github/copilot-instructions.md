@@ -127,7 +127,7 @@ MethodName_Scenario_ExpectedBehavior
 
 Examples:
 - `JobRegistry_AddJob_WithInvalidCronExpression_ThrowsArgumentException`
-- `ServiceCollectionExtensions_AddMiniCron_DefaultOptions`
+- `AddMiniCron_DefaultOptions_RegistersServicesSuccessfully`
 
 ### Test Coverage
 
