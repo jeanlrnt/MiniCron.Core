@@ -343,6 +343,13 @@ public partial class MiniCronTests
         services.AddSingleton<IHostedService, MiniCronBackgroundService>();
         services.AddLogging();
         
+        // Configure second-level granularity for faster test execution
+        services.Configure<MiniCronOptions>(options =>
+        {
+            options.Granularity = CronGranularity.Second;
+        });
+        services.AddSingleton<ISystemClock, SystemClock>();
+        
         var serviceProvider = services.BuildServiceProvider();
         var backgroundService = serviceProvider.GetServices<IHostedService>()
             .OfType<MiniCronBackgroundService>()
@@ -351,8 +358,9 @@ public partial class MiniCronTests
         using var cts = new CancellationTokenSource();
         await backgroundService.StartAsync(cts.Token);
         
-        // Wait for async job execution
-        await Task.Delay(50);
+        // Wait for background service to initialize and execute the job
+        // Second granularity means it runs within 1-2 seconds
+        await Task.Delay(2500);
         
         Assert.True(jobExecuted);
     }
