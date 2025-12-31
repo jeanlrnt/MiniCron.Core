@@ -204,17 +204,14 @@ public class MiniCronBackgroundService : BackgroundService
                                 }
                                 finally
                                 {
-                                    // Release distributed lock only if it was acquired
-                                    if (lockAcquired)
+                                    // Release distributed lock (always acquired at this point due to early return on line 162)
+                                    try
                                     {
-                                        try
-                                        {
-                                            await _lockProvider.ReleaseAsync(job.Id);
-                                        }
-                                        catch (ObjectDisposedException)
-                                        {
-                                            // Service is being disposed, ignore
-                                        }
+                                        await _lockProvider.ReleaseAsync(job.Id);
+                                    }
+                                    catch (ObjectDisposedException)
+                                    {
+                                        // Service is being disposed, ignore
                                     }
                                 }
                             }
@@ -225,8 +222,9 @@ public class MiniCronBackgroundService : BackgroundService
                             }
                             catch (ObjectDisposedException)
                             {
-                                // Service is being disposed, ignore this job execution
+                                // Service is being disposed, log and ignore this job execution
                                 sw.Stop();
+                                _logger.LogInformation("Job {JobId} execution aborted due to service disposal after {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                             }
                             catch (Exception ex)
                             {
@@ -281,7 +279,8 @@ public class MiniCronBackgroundService : BackgroundService
             disposable.Dispose();
         }
 
-        _concurrencySemaphore?.Dispose();
+        // Intentionally not disposing _concurrencySemaphore to avoid race conditions
+        // where running jobs may still be releasing the semaphore during shutdown.
         
         base.Dispose();
     }

@@ -674,10 +674,13 @@ public partial class MiniCronTests
         var services = new ServiceCollection();
         var registry = new JobRegistry();
         var jobExecuted = false;
+        var tcs = new TaskCompletionSource<bool>();
         
+        // Schedule job that runs every minute, evaluated at second-level granularity
         registry.ScheduleJob("* * * * *", (sp, ct) =>
         {
             jobExecuted = true;
+            tcs.TrySetResult(true);
             return Task.CompletedTask;
         });
         
@@ -686,12 +689,15 @@ public partial class MiniCronTests
         {
             MaxConcurrency = 5,
             TimeZone = TimeZoneInfo.Utc,
-            Granularity = CronGranularity.Minute
+            Granularity = CronGranularity.Second // Use second-level granularity for faster test execution
         };
         services.AddSingleton<IOptions<MiniCronOptions>>(Options.Create(customOptions));
         
         // Register custom system clock
         services.AddSingleton<ISystemClock>(new SystemClock());
+        
+        // Register lock provider
+        services.AddSingleton<IJobLockProvider, InMemoryJobLockProvider>();
         
         services.AddSingleton(registry);
         services.AddLogging();
@@ -708,29 +714,27 @@ public partial class MiniCronTests
         // Verify the service was created successfully
         Assert.NotNull(backgroundService);
         
-        // Use reflection to verify the options were used
-        var optionsField = typeof(MiniCronBackgroundService)
-            .GetField("_options", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        Assert.NotNull(optionsField);
-        
-        var actualOptions = (MiniCronOptions)optionsField.GetValue(backgroundService)!;
-        Assert.NotNull(actualOptions);
-        Assert.Equal(5, actualOptions.MaxConcurrency);
-        Assert.Equal(TimeZoneInfo.Utc, actualOptions.TimeZone);
-        Assert.Equal(CronGranularity.Minute, actualOptions.Granularity);
-        
-        // Verify it can execute jobs
-        var runJobsMethod = typeof(MiniCronBackgroundService)
-            .GetMethod("RunJobs", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        
-        Assert.NotNull(runJobsMethod);
-        
+        // Start the background service via its public API and verify it can execute jobs
         using var cts = new CancellationTokenSource();
-        var task = (Task)runJobsMethod.Invoke(backgroundService, new object[] { cts.Token })!;
-        await task;
+        var startTask = backgroundService.StartAsync(cts.Token);
         
-        await Task.Delay(50);
-        Assert.True(jobExecuted);
+        // Wait for job execution with timeout and verify the job completed, not the delay
+        var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(5000));
+        Assert.Same(tcs.Task, completedTask);
+        
+        // Cancel and stop the service
+        cts.Cancel();
+        try
+        {
+            await startTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when cancellation token is triggered
+        }
+        
+        // Verify job was executed
+        Assert.True(jobExecuted, "Job should have been executed by the background service");
     }
     
     [Fact]

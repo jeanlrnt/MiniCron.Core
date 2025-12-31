@@ -118,7 +118,14 @@ public class JobRegistry : IDisposable
         {
             _jobs.Add(job.Id, job);
             _logger?.LogInformation("Job added: {JobId} {Cron} Timeout: {Timeout}", job.Id, job.CronExpression, timeout);
-            JobAdded?.Invoke(this, new JobEventArgs(job));
+            try
+            {
+                JobAdded?.Invoke(this, new JobEventArgs(job));
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Unhandled exception in JobAdded event handler for job {JobId}", job.Id);
+            }
         }
         finally
         {
@@ -163,7 +170,14 @@ public class JobRegistry : IDisposable
             if (removed)
             {
                 _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, job.CronExpression);
-                JobRemoved?.Invoke(this, new JobEventArgs(job));
+                try
+                {
+                    JobRemoved?.Invoke(this, new JobEventArgs(job));
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Unhandled exception in JobRemoved event handler for job {JobId} {Cron}", jobId, job.CronExpression);
+                }
             }
             
             return removed;
@@ -196,7 +210,14 @@ public class JobRegistry : IDisposable
             _jobs[jobId] = updatedJob;
             
             _logger?.LogInformation("Job updated: {JobId} {OldCron} -> {NewCron}", jobId, existingJob.CronExpression, newCronExpression);
-            JobUpdated?.Invoke(this, new JobEventArgs(updatedJob, existingJob));
+            try
+            {
+                JobUpdated?.Invoke(this, new JobEventArgs(updatedJob, existingJob));
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Unhandled exception in JobUpdated event handler for job {JobId}", jobId);
+            }
             
             return true;
         }

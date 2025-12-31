@@ -37,10 +37,15 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
         }
         var backoffDelay = 10; // Start with 10ms
         const int maxBackoffDelay = 500; // Cap at 500ms
-        const double backoffMultiplier = 1.5; // Exponential growth factor
 
         while (!cancellationToken.IsCancellationRequested)
         {
+            // Check disposed state before each operation to prevent race conditions
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(InMemoryJobLockProvider));
+            }
+
             var now = DateTimeOffset.UtcNow;
             var expiry = now.Add(ttl);
 
@@ -73,8 +78,9 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
                 return false;
             }
 
-            // Increase backoff delay exponentially, capped at maxBackoffDelay
-            backoffDelay = Math.Min((int)(backoffDelay * backoffMultiplier), maxBackoffDelay);
+            // Increase backoff delay with integer arithmetic (backoff * 3 / 2), capped at maxBackoffDelay
+            // Note: Integer division truncates (e.g., 11 * 3 / 2 = 16, not 16.5), providing consistent progression
+            backoffDelay = Math.Min(backoffDelay * 3 / 2, maxBackoffDelay);
         }
 
         return false;

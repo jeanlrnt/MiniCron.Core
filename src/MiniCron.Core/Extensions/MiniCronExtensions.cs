@@ -34,6 +34,11 @@ public static class MiniCronExtensions
 
     /// <summary>
     /// Backwards-compatible overload that accepts a <see cref="JobRegistry"/> initializer.
+    /// <para>
+    /// <b>Note:</b> Do not use this method together with <see cref="AddMiniCronOptions"/>.
+    /// Both methods register ISystemClock and IJobLockProvider as singletons, leading to duplicate registrations.
+    /// Use either this method (for legacy registry-based initialization) or <see cref="AddMiniCronOptions"/> (for modern configuration-based initialization).
+    /// </para>
     /// </summary>
     public static IServiceCollection AddMiniCron(this IServiceCollection services, Action<JobRegistry> configure)
     {

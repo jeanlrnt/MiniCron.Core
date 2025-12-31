@@ -189,13 +189,13 @@ builder.Services.PostConfigure<MiniCronOptions>(opts =>
         }
         catch (TimeZoneNotFoundException ex)
         {
-            // Log configuration error and fallback to UTC if the configured timezone is invalid
+            // Early-stage configuration error: use Console.Error intentionally here because the logging system may not be initialized yet.
             System.Console.Error.WriteLine($"MiniCron configuration error: invalid time zone '{tzId}'. Falling back to UTC. {ex}");
             opts.TimeZone = TimeZoneInfo.Utc;
         }
         catch (InvalidTimeZoneException ex)
         {
-            // Log configuration error and fallback to UTC if the configured timezone data is invalid
+            // Early-stage configuration error: use Console.Error intentionally here because the logging system may not be initialized yet.
             System.Console.Error.WriteLine($"MiniCron configuration error: invalid time zone data for '{tzId}'. Falling back to UTC. {ex}");
             opts.TimeZone = TimeZoneInfo.Utc;
         }
