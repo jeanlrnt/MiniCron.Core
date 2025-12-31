@@ -15,7 +15,7 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
 {
     private readonly ConcurrentDictionary<Guid, DateTimeOffset> _locks = new();
     private volatile bool _disposed;
-    private readonly ManualResetEventSlim _lockReleasedSignal = new(false);
+    private readonly SemaphoreSlim _lockReleasedSignal = new(0, 1);
 
     /// <summary>
     /// Attempts to acquire a lock for the specified job with a time-to-live (TTL).
@@ -70,19 +70,16 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
             // This combines event-based signaling with progressive backoff
             try
             {
-                _lockReleasedSignal.Wait(backoffDelay, cancellationToken);
+                await _lockReleasedSignal.WaitAsync(backoffDelay, cancellationToken);
             }
             catch (OperationCanceledException)
             {
                 // Cancellation requested, return false as documented
                 return false;
             }
-            
-            // Reset the signal for the next waiting thread
-            _lockReleasedSignal.Reset();
 
             // Increase backoff delay with integer arithmetic (backoff * 3 / 2), capped at maxBackoffDelay
-            // Note: Integer division truncates (e.g., 15 * 3 / 2 = 22, not 22.5), providing consistent progression
+            // Note: Integer division truncates (e.g., 15 * 3 / 2 = 22, truncated from 22.5), providing consistent progression
             backoffDelay = Math.Min(backoffDelay * 3 / 2, maxBackoffDelay);
         }
 
@@ -105,7 +102,11 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
         _locks.TryRemove(jobId, out _);
         
         // Signal waiting threads that a lock has been released
-        _lockReleasedSignal.Set();
+        // Check current count to avoid SemaphoreFullException
+        if (_lockReleasedSignal.CurrentCount == 0)
+        {
+            _lockReleasedSignal.Release();
+        }
         
         return Task.CompletedTask;
     }
