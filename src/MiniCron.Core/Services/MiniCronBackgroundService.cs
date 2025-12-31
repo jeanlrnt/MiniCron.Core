@@ -276,13 +276,13 @@ public class MiniCronBackgroundService : BackgroundService
 
     public override void Dispose()
     {
-        base.Dispose();
-
         if (_ownsLockProvider && _lockProvider is IDisposable disposable)
         {
             disposable.Dispose();
         }
 
         _concurrencySemaphore?.Dispose();
+        
+        base.Dispose();
     }
 }
