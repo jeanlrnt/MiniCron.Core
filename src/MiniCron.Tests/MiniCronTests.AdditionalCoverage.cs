@@ -676,7 +676,7 @@ public partial class MiniCronTests
         var jobExecuted = false;
         var tcs = new TaskCompletionSource<bool>();
         
-        // Schedule job that runs every second
+        // Schedule job that runs every minute, evaluated at second-level granularity
         registry.ScheduleJob("* * * * *", (sp, ct) =>
         {
             jobExecuted = true;
@@ -718,8 +718,9 @@ public partial class MiniCronTests
         using var cts = new CancellationTokenSource();
         var startTask = backgroundService.StartAsync(cts.Token);
         
-        // Wait for job execution with timeout
-        await Task.WhenAny(tcs.Task, Task.Delay(5000));
+        // Wait for job execution with timeout and verify the job completed, not the delay
+        var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(5000));
+        Assert.Same(tcs.Task, completedTask);
         
         // Cancel and stop the service
         cts.Cancel();
