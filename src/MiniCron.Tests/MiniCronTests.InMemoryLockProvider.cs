@@ -16,10 +16,8 @@ public partial class MiniCronTests
         var a1 = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
         Assert.True(a1);
 
-        // Immediate second acquire while lock is still held should fail
-        // Use a near-immediate cancellation token timeout to avoid timing races with the TTL
-        using var cts = new CancellationTokenSource(1);
-        var a2 = await provider.TryAcquireAsync(jobId, ttl, cts.Token);
+        // Immediate second acquire while lock is still held should fail immediately
+        var a2 = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
         Assert.False(a2);
 
         // Release should allow re-acquire
@@ -55,5 +53,86 @@ public partial class MiniCronTests
         // ReleaseAsync should throw ObjectDisposedException
         await Assert.ThrowsAsync<ObjectDisposedException>(async () =>
             await provider.ReleaseAsync(jobId));
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_TryAcquireAsync_WithHeldLock_ReturnsFalseImmediately()
+    {
+        // This test validates the "Try" semantics: when a lock is held, 
+        // TryAcquireAsync should return false immediately instead of blocking
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var ttl = TimeSpan.FromSeconds(10); // Long TTL to ensure lock is held during test
+
+        // Arrange: Acquire the lock first
+        var acquired = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
+        Assert.True(acquired, "First acquisition should succeed");
+
+        // Act: Try to acquire the same lock again without waiting
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var secondAcquire = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
+        sw.Stop();
+
+        // Assert: Should return false immediately (within 100ms)
+        Assert.False(secondAcquire, "Second acquisition should fail immediately");
+        Assert.True(sw.ElapsedMilliseconds < 100, 
+            $"TryAcquireAsync should return immediately, but took {sw.ElapsedMilliseconds}ms");
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_TryAcquireAsync_DoesNotBlock_WhenLockIsHeld()
+    {
+        // This test verifies that TryAcquireAsync doesn't block the thread when lock is held
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var ttl = TimeSpan.FromSeconds(10); // Long TTL
+
+        // Acquire the lock
+        await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
+
+        // Try to acquire multiple times in parallel - all should return false immediately
+        var tasks = Enumerable.Range(0, 5)
+            .Select(_ => Task.Run(async () =>
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var result = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
+                sw.Stop();
+                return (result, sw.ElapsedMilliseconds);
+            }))
+            .ToList();
+
+        var results = await Task.WhenAll(tasks);
+
+        // All attempts should fail and complete quickly
+        foreach (var (result, elapsed) in results)
+        {
+            Assert.False(result, "All parallel acquisitions should fail");
+            Assert.True(elapsed < 100, $"Each attempt should complete quickly, but took {elapsed}ms");
+        }
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_TryAcquireAsync_WithExpiredLock_Succeeds()
+    {
+        // This test verifies that expired locks can be replaced immediately
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var shortTtl = TimeSpan.FromMilliseconds(50);
+
+        // Acquire the lock with short TTL
+        var acquired = await provider.TryAcquireAsync(jobId, shortTtl, CancellationToken.None);
+        Assert.True(acquired, "First acquisition should succeed");
+
+        // Wait for the lock to expire
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+        // Try to acquire again - should succeed immediately since lock expired
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var secondAcquire = await provider.TryAcquireAsync(jobId, shortTtl, CancellationToken.None);
+        sw.Stop();
+
+        Assert.True(secondAcquire, "Should acquire expired lock");
+        Assert.True(sw.ElapsedMilliseconds < 100, 
+            $"Acquiring expired lock should be immediate, but took {sw.ElapsedMilliseconds}ms");
     }
 }

@@ -85,30 +85,6 @@ public partial class MiniCronTests
     }
     
     [Fact]
-    public async Task InMemoryJobLockProvider_TryAcquire_WithLongWait_EventuallyAcquires()
-    {
-        var provider = new InMemoryJobLockProvider();
-        var jobId = Guid.NewGuid();
-        
-        // First acquire
-        var acquired1 = await provider.TryAcquireAsync(jobId, TimeSpan.FromMilliseconds(50), CancellationToken.None);
-        Assert.True(acquired1);
-        
-        // Start second acquire in background (will wait for TTL)
-        var acquireTask = Task.Run(async () =>
-        {
-            var acquired = await provider.TryAcquireAsync(jobId, TimeSpan.FromMinutes(1), CancellationToken.None);
-            return acquired;
-        });
-        
-        // Wait for lock to expire
-        await Task.Delay(100);
-        
-        var acquired2 = await acquireTask;
-        Assert.True(acquired2);
-    }
-    
-    [Fact]
     public void CronHelper_ValidateField_WithInvalidStepFormat_ThrowsException()
     {
         var registry = new JobRegistry();
