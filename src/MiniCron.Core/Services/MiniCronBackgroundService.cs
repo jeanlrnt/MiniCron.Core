@@ -152,9 +152,15 @@ public class MiniCronBackgroundService : BackgroundService
                             try
                             {
                                 // Attempt to acquire distributed lock first (TTL = job timeout or default)
-                                // This avoids blocking concurrency slots while waiting for locks held by other instances
                                 var ttl = job.Timeout ?? _options.DefaultJobTimeout ?? TimeSpan.FromMinutes(30);
                                 lockAcquired = await _lockProvider.TryAcquireAsync(job.Id, ttl, stoppingToken);
+
+                                if (!lockAcquired)
+                                {
+                                    _logger.LogWarning("Could not acquire lock for job {JobId}, skipping", job.Id);
+                                    _runningJobs.TryRemove(job.Id, out _);
+                                    return;
+                                }
 
                                 if (!lockAcquired)
                                 {
@@ -201,6 +207,9 @@ public class MiniCronBackgroundService : BackgroundService
                                             }
                                         }
                                     }
+
+                                    sw.Stop();
+                                    _logger.LogInformation("Job completed {JobId} in {ElapsedMs}ms", job.Id, sw.ElapsedMilliseconds);
                                 }
                                 finally
                                 {
@@ -235,6 +244,11 @@ public class MiniCronBackgroundService : BackgroundService
                             }
                             finally
                             {
+                                // Release distributed lock if it was acquired
+                                if (lockAcquired)
+                                {
+                                    await _lockProvider.ReleaseAsync(job.Id);
+                                }
                                 // Ensure stopwatch is stopped
                                 if (sw.IsRunning)
                                 {
