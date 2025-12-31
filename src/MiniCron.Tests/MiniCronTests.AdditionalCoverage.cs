@@ -814,9 +814,9 @@ public partial class MiniCronTests
         var jobExecuted = false;
         var registry = new JobRegistry();
         
-        // Create a job that will have a specific timeout
-        // Note: CronJob.Timeout is currently read-only, so this test verifies the default timeout path
-        // Future enhancement: support job-specific timeouts via JobRegistry API
+        // Create a job that will run under the default timeout configured in MiniCronOptions
+        // Note: this test verifies the default timeout path rather than configuring a per-job timeout
+        // (job-specific timeouts are handled elsewhere and are not exercised by this test)
         registry.ScheduleJob("* * * * *", async (sp, ct) =>
         {
             jobExecuted = true;
