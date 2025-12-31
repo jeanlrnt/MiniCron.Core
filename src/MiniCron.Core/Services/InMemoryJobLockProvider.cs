@@ -102,10 +102,16 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
         _locks.TryRemove(jobId, out _);
         
         // Signal waiting threads that a lock has been released
-        // Check current count to avoid SemaphoreFullException
-        if (_lockReleasedSignal.CurrentCount == 0)
+        // Use try-catch because concurrent releases may cause SemaphoreFullException
+        // This is the correct pattern for signaling without race conditions
+        try
         {
             _lockReleasedSignal.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+            // Already at max count (1), no action needed
+            // This can occur when multiple threads release locks concurrently
         }
         
         return Task.CompletedTask;
