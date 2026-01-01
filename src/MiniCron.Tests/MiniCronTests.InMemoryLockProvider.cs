@@ -142,4 +142,247 @@ public partial class MiniCronTests
 
         Assert.False(result, "Should return false when cancellation is requested");
     }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_MultipleJobIds_AreIndependent()
+    {
+        // Test that locks for different job IDs are isolated from each other
+        var provider = new InMemoryJobLockProvider();
+        var jobId1 = Guid.NewGuid();
+        var jobId2 = Guid.NewGuid();
+        var jobId3 = Guid.NewGuid();
+        var ttl = TimeSpan.FromSeconds(10);
+
+        // Acquire locks for all three jobs
+        var acquired1 = await provider.TryAcquireAsync(jobId1, ttl, CancellationToken.None);
+        var acquired2 = await provider.TryAcquireAsync(jobId2, ttl, CancellationToken.None);
+        var acquired3 = await provider.TryAcquireAsync(jobId3, ttl, CancellationToken.None);
+
+        // All should succeed since they're different job IDs
+        Assert.True(acquired1, "Job 1 lock should be acquired");
+        Assert.True(acquired2, "Job 2 lock should be acquired");
+        Assert.True(acquired3, "Job 3 lock should be acquired");
+
+        // Attempting to acquire any of them again should fail
+        Assert.False(await provider.TryAcquireAsync(jobId1, ttl, CancellationToken.None));
+        Assert.False(await provider.TryAcquireAsync(jobId2, ttl, CancellationToken.None));
+        Assert.False(await provider.TryAcquireAsync(jobId3, ttl, CancellationToken.None));
+
+        // Release one lock - only that job should be re-acquirable
+        await provider.ReleaseAsync(jobId2);
+        Assert.False(await provider.TryAcquireAsync(jobId1, ttl, CancellationToken.None));
+        Assert.True(await provider.TryAcquireAsync(jobId2, ttl, CancellationToken.None));
+        Assert.False(await provider.TryAcquireAsync(jobId3, ttl, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_ConcurrentAcquireAndRelease_ThreadSafe()
+    {
+        // Test thread safety when multiple threads try to acquire and release locks
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var ttl = TimeSpan.FromMilliseconds(50);
+        var successCount = 0;
+        var concurrentHoldCount = 0;
+        var maxConcurrentHoldCount = 0;
+
+        // Run 20 concurrent tasks that try to acquire and release
+        var tasks = Enumerable.Range(0, 20).Select(_ => Task.Run(async () =>
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                if (await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None))
+                {
+                    Interlocked.Increment(ref successCount);
+                    var currentHold = Interlocked.Increment(ref concurrentHoldCount);
+                    
+                    // Track max concurrent holders
+                    var currentMax = maxConcurrentHoldCount;
+                    while (currentHold > currentMax)
+                    {
+                        var original = Interlocked.CompareExchange(ref maxConcurrentHoldCount, currentHold, currentMax);
+                        if (original == currentMax) break;
+                        currentMax = maxConcurrentHoldCount;
+                    }
+                    
+                    await Task.Delay(10); // Hold the lock briefly
+                    Interlocked.Decrement(ref concurrentHoldCount);
+                    await provider.ReleaseAsync(jobId);
+                }
+                await Task.Delay(5); // Small delay between attempts
+            }
+        })).ToArray();
+
+        await Task.WhenAll(tasks);
+
+        // Verify that lock was never held by multiple threads simultaneously
+        Assert.Equal(1, maxConcurrentHoldCount);
+        // At least some attempts should have succeeded
+        Assert.True(successCount > 0, $"Expected some lock acquisitions to succeed, but got {successCount}");
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_RaceConditionOnExpiredLock_OnlyOneAcquires()
+    {
+        // Test the race condition where multiple threads try to acquire an expired lock simultaneously
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var shortTtl = TimeSpan.FromMilliseconds(50);
+
+        // First acquire the lock
+        var initialAcquire = await provider.TryAcquireAsync(jobId, shortTtl, CancellationToken.None);
+        Assert.True(initialAcquire, "Initial acquisition should succeed");
+
+        // Wait for lock to expire
+        await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+        // Launch multiple threads to try to acquire the expired lock simultaneously
+        var tasks = Enumerable.Range(0, 50).Select(_ => Task.Run(async () =>
+        {
+            return await provider.TryAcquireAsync(jobId, TimeSpan.FromSeconds(1), CancellationToken.None);
+        })).ToArray();
+
+        var results = await Task.WhenAll(tasks);
+
+        // Only one thread should successfully acquire the lock (thanks to TryUpdate compare-and-swap)
+        var successCount = results.Count(r => r);
+        Assert.Equal(1, successCount);
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_ReleaseNonExistentLock_DoesNotThrow()
+    {
+        // Test that releasing a lock that was never acquired doesn't cause issues
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+
+        // Should not throw
+        await provider.ReleaseAsync(jobId);
+        
+        // Should still be able to acquire afterwards
+        var acquired = await provider.TryAcquireAsync(jobId, TimeSpan.FromSeconds(1), CancellationToken.None);
+        Assert.True(acquired, "Should be able to acquire after releasing non-existent lock");
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_RepeatedAcquireReleaseCycles_WorksCorrectly()
+    {
+        // Test repeated acquire/release cycles on the same job ID
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var ttl = TimeSpan.FromMilliseconds(100);
+
+        for (int i = 0; i < 10; i++)
+        {
+            // Acquire
+            var acquired = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
+            Assert.True(acquired, $"Acquisition {i + 1} should succeed");
+
+            // Verify it's held
+            var secondAcquire = await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None);
+            Assert.False(secondAcquire, $"Second acquisition {i + 1} should fail");
+
+            // Release
+            await provider.ReleaseAsync(jobId);
+        }
+    }
+
+    [Fact]
+    public void InMemoryJobLockProvider_DisposeIsIdempotent()
+    {
+        // Test that calling Dispose multiple times is safe
+        var provider = new InMemoryJobLockProvider();
+
+        // First dispose
+        provider.Dispose();
+
+        // Second dispose should not throw
+        provider.Dispose();
+
+        // Third dispose should not throw
+        provider.Dispose();
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_VeryShortTTL_WorksCorrectly()
+    {
+        // Test with a very short TTL to ensure edge case handling
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var veryShortTtl = TimeSpan.FromMilliseconds(1);
+
+        var acquired = await provider.TryAcquireAsync(jobId, veryShortTtl, CancellationToken.None);
+        Assert.True(acquired, "Should acquire with very short TTL");
+
+        // Wait for expiry
+        await Task.Delay(TimeSpan.FromMilliseconds(10));
+
+        // Should be able to acquire again
+        var secondAcquire = await provider.TryAcquireAsync(jobId, veryShortTtl, CancellationToken.None);
+        Assert.True(secondAcquire, "Should re-acquire after very short TTL expires");
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_LongTTL_WorksCorrectly()
+    {
+        // Test with a very long TTL
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var longTtl = TimeSpan.FromHours(1);
+
+        var acquired = await provider.TryAcquireAsync(jobId, longTtl, CancellationToken.None);
+        Assert.True(acquired, "Should acquire with long TTL");
+
+        // Verify it's held
+        var secondAcquire = await provider.TryAcquireAsync(jobId, longTtl, CancellationToken.None);
+        Assert.False(secondAcquire, "Should not re-acquire while long TTL is active");
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_ZeroTTL_ExpiresImmediately()
+    {
+        // Test with zero TTL - lock should expire immediately
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var zeroTtl = TimeSpan.Zero;
+
+        var acquired = await provider.TryAcquireAsync(jobId, zeroTtl, CancellationToken.None);
+        Assert.True(acquired, "Should acquire with zero TTL");
+
+        // Insert a small delay to avoid relying on clock precision; zero TTL should not block re-acquisition
+        await Task.Delay(TimeSpan.FromMilliseconds(1));
+
+        // Should be able to acquire immediately since TTL is zero (already expired)
+        var secondAcquire = await provider.TryAcquireAsync(jobId, TimeSpan.FromSeconds(1), CancellationToken.None);
+        Assert.True(secondAcquire, "Should re-acquire immediately with zero TTL");
+    }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_AcquireAfterRelease_MultipleJobIds()
+    {
+        // Test that after releasing, a different job can acquire
+        var provider = new InMemoryJobLockProvider();
+        var jobId1 = Guid.NewGuid();
+        var jobId2 = Guid.NewGuid();
+        var ttl = TimeSpan.FromSeconds(10);
+
+        // Acquire first job
+        var acquired1 = await provider.TryAcquireAsync(jobId1, ttl, CancellationToken.None);
+        Assert.True(acquired1);
+
+        // Second job can still acquire (different ID)
+        var acquired2 = await provider.TryAcquireAsync(jobId2, ttl, CancellationToken.None);
+        Assert.True(acquired2);
+
+        // Release first job
+        await provider.ReleaseAsync(jobId1);
+
+        // First job can be re-acquired
+        var reacquired1 = await provider.TryAcquireAsync(jobId1, ttl, CancellationToken.None);
+        Assert.True(reacquired1);
+
+        // Second job still held
+        var tryAcquire2Again = await provider.TryAcquireAsync(jobId2, ttl, CancellationToken.None);
+        Assert.False(tryAcquire2Again);
+    }
 }
