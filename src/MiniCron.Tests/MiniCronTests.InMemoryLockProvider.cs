@@ -181,8 +181,10 @@ public partial class MiniCronTests
         // Test thread safety when multiple threads try to acquire and release locks
         var provider = new InMemoryJobLockProvider();
         var jobId = Guid.NewGuid();
-        var ttl = TimeSpan.FromSeconds(1);
+        var ttl = TimeSpan.FromMilliseconds(50);
         var successCount = 0;
+        var concurrentHoldCount = 0;
+        var maxConcurrentHoldCount = 0;
 
         // Run 20 concurrent tasks that try to acquire and release
         var tasks = Enumerable.Range(0, 20).Select(_ => Task.Run(async () =>
@@ -192,7 +194,19 @@ public partial class MiniCronTests
                 if (await provider.TryAcquireAsync(jobId, ttl, CancellationToken.None))
                 {
                     Interlocked.Increment(ref successCount);
+                    var currentHold = Interlocked.Increment(ref concurrentHoldCount);
+                    
+                    // Track max concurrent holders
+                    var currentMax = maxConcurrentHoldCount;
+                    while (currentHold > currentMax)
+                    {
+                        var original = Interlocked.CompareExchange(ref maxConcurrentHoldCount, currentHold, currentMax);
+                        if (original == currentMax) break;
+                        currentMax = maxConcurrentHoldCount;
+                    }
+                    
                     await Task.Delay(10); // Hold the lock briefly
+                    Interlocked.Decrement(ref concurrentHoldCount);
                     await provider.ReleaseAsync(jobId);
                 }
                 await Task.Delay(5); // Small delay between attempts
@@ -201,6 +215,8 @@ public partial class MiniCronTests
 
         await Task.WhenAll(tasks);
 
+        // Verify that lock was never held by multiple threads simultaneously
+        Assert.Equal(1, maxConcurrentHoldCount);
         // At least some attempts should have succeeded
         Assert.True(successCount > 0, $"Expected some lock acquisitions to succeed, but got {successCount}");
     }
@@ -221,7 +237,7 @@ public partial class MiniCronTests
         await Task.Delay(TimeSpan.FromMilliseconds(100));
 
         // Launch multiple threads to try to acquire the expired lock simultaneously
-        var tasks = Enumerable.Range(0, 10).Select(_ => Task.Run(async () =>
+        var tasks = Enumerable.Range(0, 50).Select(_ => Task.Run(async () =>
         {
             return await provider.TryAcquireAsync(jobId, TimeSpan.FromSeconds(1), CancellationToken.None);
         })).ToArray();
@@ -249,7 +265,7 @@ public partial class MiniCronTests
     }
 
     [Fact]
-    public async Task InMemoryJobLockProvider_RepeatedAcquireReleasecycles_WorksCorrectly()
+    public async Task InMemoryJobLockProvider_RepeatedAcquireReleaseCycles_WorksCorrectly()
     {
         // Test repeated acquire/release cycles on the same job ID
         var provider = new InMemoryJobLockProvider();
@@ -333,37 +349,12 @@ public partial class MiniCronTests
         var acquired = await provider.TryAcquireAsync(jobId, zeroTtl, CancellationToken.None);
         Assert.True(acquired, "Should acquire with zero TTL");
 
+        // Insert a small delay to avoid relying on clock precision; zero TTL should not block re-acquisition
+        await Task.Delay(TimeSpan.FromMilliseconds(1));
+
         // Should be able to acquire immediately since TTL is zero (already expired)
         var secondAcquire = await provider.TryAcquireAsync(jobId, TimeSpan.FromSeconds(1), CancellationToken.None);
         Assert.True(secondAcquire, "Should re-acquire immediately with zero TTL");
-    }
-
-    [Fact]
-    public async Task InMemoryJobLockProvider_ConcurrentExpiredLockReplace_HandledCorrectly()
-    {
-        // Test scenario where lock expires and multiple threads race to replace it
-        var provider = new InMemoryJobLockProvider();
-        var jobId = Guid.NewGuid();
-        var shortTtl = TimeSpan.FromMilliseconds(50);
-
-        // Acquire initial lock
-        await provider.TryAcquireAsync(jobId, shortTtl, CancellationToken.None);
-
-        // Wait for it to expire
-        await Task.Delay(TimeSpan.FromMilliseconds(100));
-
-        // Multiple threads try to acquire the expired lock
-        var concurrentAttempts = 50;
-        var tasks = Enumerable.Range(0, concurrentAttempts).Select(_ => Task.Run(async () =>
-        {
-            return await provider.TryAcquireAsync(jobId, TimeSpan.FromSeconds(1), CancellationToken.None);
-        })).ToArray();
-
-        var results = await Task.WhenAll(tasks);
-
-        // Exactly one should succeed
-        var successCount = results.Count(r => r);
-        Assert.Equal(1, successCount);
     }
 
     [Fact]
