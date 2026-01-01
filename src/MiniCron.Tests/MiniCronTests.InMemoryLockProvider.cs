@@ -135,4 +135,22 @@ public partial class MiniCronTests
         Assert.True(sw.ElapsedMilliseconds < 100, 
             $"Acquiring expired lock should be immediate, but took {sw.ElapsedMilliseconds}ms");
     }
+
+    [Fact]
+    public async Task InMemoryJobLockProvider_TryAcquireAsync_WithCancelledToken_ReturnsFalse()
+    {
+        // This test verifies that the method respects cancellation tokens
+        var provider = new InMemoryJobLockProvider();
+        var jobId = Guid.NewGuid();
+        var ttl = TimeSpan.FromSeconds(10);
+
+        // Create a pre-cancelled token
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Try to acquire with cancelled token - should return false immediately
+        var result = await provider.TryAcquireAsync(jobId, ttl, cts.Token);
+
+        Assert.False(result, "Should return false when cancellation is requested");
+    }
 }

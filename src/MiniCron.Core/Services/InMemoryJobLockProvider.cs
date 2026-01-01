@@ -22,15 +22,21 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
     /// </summary>
     /// <param name="jobId">The unique identifier of the job to lock.</param>
     /// <param name="ttl">The time-to-live for the lock.</param>
-    /// <param name="cancellationToken">Token to cancel the acquisition attempt (unused in this implementation).</param>
+    /// <param name="cancellationToken">Token to cancel the acquisition attempt.</param>
     /// <returns>
-    /// True if the lock was successfully acquired; false if the lock is currently held by another execution.
+    /// True if the lock was successfully acquired; false if the lock is currently held by another execution
+    /// or if cancellation was requested.
     /// </returns>
     public Task<bool> TryAcquireAsync(Guid jobId, TimeSpan ttl, CancellationToken cancellationToken)
     {
         if (_disposed)
         {
             throw new ObjectDisposedException(nameof(InMemoryJobLockProvider));
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromResult(false);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -43,16 +49,13 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
         }
 
         // If existing lock expired, try to replace it
-        if (_locks.TryGetValue(jobId, out var existingExpiry))
+        if (_locks.TryGetValue(jobId, out var existingExpiry) && existingExpiry <= now)
         {
-            if (existingExpiry <= now)
+            // Lock has expired, try to update it
+            var refreshedExpiry = now.Add(ttl);
+            if (_locks.TryUpdate(jobId, refreshedExpiry, existingExpiry))
             {
-                // Lock has expired, try to update it
-                var refreshedExpiry = now.Add(ttl);
-                if (_locks.TryUpdate(jobId, refreshedExpiry, existingExpiry))
-                {
-                    return Task.FromResult(true);
-                }
+                return Task.FromResult(true);
             }
         }
 
