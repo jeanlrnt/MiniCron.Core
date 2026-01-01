@@ -49,11 +49,13 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
         }
 
         // If existing lock expired, try to replace it
-        // Capture fresh timestamp to ensure accurate expiry check
+        // Capture a fresh timestamp to improve expiry accuracy and reduce the race window;
+        // correctness is enforced by TryUpdate's compare-and-swap semantics below.
         var nowForExpiry = DateTimeOffset.UtcNow;
         if (_locks.TryGetValue(jobId, out var existingExpiry) && existingExpiry <= nowForExpiry)
         {
-            // Lock has expired, try to update it
+            // Lock has expired based on the value we observed; TryUpdate will only succeed
+            // if the lock's expiry is still 'existingExpiry' (i.e., no other thread refreshed it).
             var refreshedExpiry = nowForExpiry.Add(ttl);
             if (_locks.TryUpdate(jobId, refreshedExpiry, existingExpiry))
             {
