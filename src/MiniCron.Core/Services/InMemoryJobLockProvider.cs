@@ -15,75 +15,52 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
 {
     private readonly ConcurrentDictionary<Guid, DateTimeOffset> _locks = new();
     private volatile bool _disposed;
-    private readonly SemaphoreSlim _lockReleasedSignal = new(0, 1);
 
     /// <summary>
     /// Attempts to acquire a lock for the specified job with a time-to-live (TTL).
-    /// Uses a combination of event-based signaling and progressive backoff for efficiency.
+    /// Returns immediately with the result - does not wait or block if the lock is held.
     /// </summary>
     /// <param name="jobId">The unique identifier of the job to lock.</param>
     /// <param name="ttl">The time-to-live for the lock.</param>
     /// <param name="cancellationToken">Token to cancel the acquisition attempt.</param>
     /// <returns>
-    /// True if the lock was successfully acquired; false if the operation was cancelled
-    /// or the lock could not be acquired within the cancellation period.
-    /// When cancelled, the method returns false rather than throwing an exception.
+    /// True if the lock was successfully acquired; false if the lock is currently held by another execution
+    /// or if cancellation was requested.
     /// </returns>
-    public async Task<bool> TryAcquireAsync(Guid jobId, TimeSpan ttl, CancellationToken cancellationToken)
+    public Task<bool> TryAcquireAsync(Guid jobId, TimeSpan ttl, CancellationToken cancellationToken)
     {
         if (_disposed)
         {
             throw new ObjectDisposedException(nameof(InMemoryJobLockProvider));
         }
-        var backoffDelay = 10; // Start with 10ms
-        const int maxBackoffDelay = 500; // Cap at 500ms
 
-        while (!cancellationToken.IsCancellationRequested)
+        if (cancellationToken.IsCancellationRequested)
         {
-            // Check disposed state before each operation to prevent race conditions
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(InMemoryJobLockProvider));
-            }
-
-            var now = DateTimeOffset.UtcNow;
-            var expiry = now.Add(ttl);
-
-            // Try add new lock
-            if (_locks.TryAdd(jobId, expiry))
-            {
-                return true;
-            }
-
-            // If existing lock expired, try to replace it
-            if (_locks.TryGetValue(jobId, out var existingExpiry))
-            {
-                var refreshedExpiry = DateTimeOffset.UtcNow.Add(ttl);
-                if (existingExpiry <= DateTimeOffset.UtcNow
-                    && _locks.TryUpdate(jobId, refreshedExpiry, existingExpiry))
-                {
-                    return true;
-                }
-            }
-
-            // Wait for either a lock release signal or backoff delay
-            // This combines event-based signaling with progressive backoff
-            try
-            {
-                await _lockReleasedSignal.WaitAsync(backoffDelay, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                // Cancellation requested, return false as documented
-                return false;
-            }
-
-            // Increase backoff delay with integer arithmetic (backoff * 3 / 2), capped at maxBackoffDelay
-            // Note: Integer division truncates (e.g., 15 * 3 / 2 = 22, truncated from 22.5), providing consistent progression
-            backoffDelay = Math.Min(backoffDelay * 3 / 2, maxBackoffDelay);
+            return Task.FromResult(false);
         }
 
-        return false;
+        var now = DateTimeOffset.UtcNow;
+        var expiry = now.Add(ttl);
+
+        // Try to add new lock
+        if (_locks.TryAdd(jobId, expiry))
+        {
+            return Task.FromResult(true);
+        }
+
+        // If existing lock expired, try to replace it
+        if (_locks.TryGetValue(jobId, out var existingExpiry) && existingExpiry <= now)
+        {
+            // Lock has expired, try to update it
+            var refreshedExpiry = now.Add(ttl);
+            if (_locks.TryUpdate(jobId, refreshedExpiry, existingExpiry))
+            {
+                return Task.FromResult(true);
+            }
+        }
+
+        // Lock is held and valid - return false immediately
+        return Task.FromResult(false);
     }
 
     /// <summary>
@@ -101,19 +78,6 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
 
         _locks.TryRemove(jobId, out _);
         
-        // Signal waiting threads that a lock has been released
-        // Use try-catch because concurrent releases may cause SemaphoreFullException
-        // This is the correct pattern for signaling without race conditions
-        try
-        {
-            _lockReleasedSignal.Release();
-        }
-        catch (SemaphoreFullException)
-        {
-            // Already at max count (1), no action needed
-            // This can occur when multiple threads release locks concurrently
-        }
-        
         return Task.CompletedTask;
     }
 
@@ -129,6 +93,5 @@ public class InMemoryJobLockProvider : IJobLockProvider, IDisposable
         }
         _disposed = true;
         _locks.Clear();
-        _lockReleasedSignal.Dispose();
     }
 }
