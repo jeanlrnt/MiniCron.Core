@@ -1,7 +1,0 @@
-Test run for /home/runner/work/MiniCron.Core/MiniCron.Core/src/MiniCron.Tests/bin/Debug/net10.0/MiniCron.Tests.dll (.NETCoreApp,Version=v10.0)
-VSTest version 18.0.1 (x64)
-
-Starting test execution, please wait...
-A total of 1 test files matched the specified pattern.
-
-Passed!  - Failed:     0, Passed:   155, Skipped:     0, Total:   155, Duration: 3 s - MiniCron.Tests.dll (net10.0)
