@@ -14,11 +14,11 @@ public class JobRegistry : IDisposable
     /// Occurs when a job is added to the registry.
     /// </summary>
     /// <remarks>
-    /// This event is raised inside the write lock, ensuring event handlers observe consistent registry state.
-    /// Event handlers should be lightweight to avoid blocking other registry operations.
+    /// This event is raised after the write lock is released, ensuring event handlers do not block registry operations.
+    /// Event handlers observe the job state at the time of addition.
     /// <para>
-    /// <strong>Note:</strong> Event handlers may call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob)
-    /// as the lock supports recursion. However, this should be done judiciously to avoid performance degradation.
+    /// <strong>Note:</strong> Event handlers can safely call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob)
+    /// without risk of deadlock, as the event is invoked outside the lock.
     /// </para>
     /// </remarks>
     public event EventHandler<JobEventArgs>? JobAdded;
@@ -27,11 +27,11 @@ public class JobRegistry : IDisposable
     /// Occurs when a job is removed from the registry.
     /// </summary>
     /// <remarks>
-    /// This event is raised inside the write lock, ensuring event handlers observe consistent registry state.
-    /// Event handlers should be lightweight to avoid blocking other registry operations.
+    /// This event is raised after the write lock is released, ensuring event handlers do not block registry operations.
+    /// Event handlers observe the job state at the time of removal.
     /// <para>
-    /// <strong>Note:</strong> Event handlers may call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob)
-    /// as the lock supports recursion. However, this should be done judiciously to avoid performance degradation.
+    /// <strong>Note:</strong> Event handlers can safely call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob)
+    /// without risk of deadlock, as the event is invoked outside the lock.
     /// </para>
     /// </remarks>
     public event EventHandler<JobEventArgs>? JobRemoved;
@@ -40,11 +40,11 @@ public class JobRegistry : IDisposable
     /// Occurs when a job's schedule is updated in the registry.
     /// </summary>
     /// <remarks>
-    /// This event is raised inside the write lock, ensuring event handlers observe consistent registry state.
-    /// Event handlers should be lightweight to avoid blocking other registry operations.
+    /// This event is raised after the write lock is released, ensuring event handlers do not block registry operations.
+    /// Event handlers observe the job state at the time of update.
     /// <para>
-    /// <strong>Note:</strong> Event handlers may call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob)
-    /// as the lock supports recursion. However, this should be done judiciously to avoid performance degradation.
+    /// <strong>Note:</strong> Event handlers can safely call back into the JobRegistry (e.g., RemoveJob, UpdateSchedule, ScheduleJob)
+    /// without risk of deadlock, as the event is invoked outside the lock.
     /// </para>
     /// </remarks>
     public event EventHandler<JobEventArgs>? JobUpdated;
@@ -65,26 +65,39 @@ public class JobRegistry : IDisposable
         CronHelper.ValidateCronExpression(cronExpression);
 
         var job = new CronJob(cronExpression, action);
+        JobEventArgs? eventArgs = null;
 
         _lock.EnterWriteLock();
         try
         {
             _jobs.Add(job.Id, job);
             _logger?.LogInformation("Job added: {JobId} {Cron}", job.Id, job.CronExpression);
-            try
+            
+            // Prepare event args if there are subscribers, but don't invoke yet
+            if (JobAdded != null)
             {
-                JobAdded?.Invoke(this, new JobEventArgs(job));
+                eventArgs = new JobEventArgs(job);
             }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Unhandled exception in JobAdded event handler for job {JobId}", job.Id);
-            }
-            return job.Id;
         }
         finally
         {
             _lock.ExitWriteLock();
         }
+
+        // Invoke event outside the lock
+        if (eventArgs != null)
+        {
+            try
+            {
+                JobAdded?.Invoke(this, eventArgs);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Unhandled exception in JobAdded event handler for job {JobId}", job.Id);
+            }
+        }
+
+        return job.Id;
     }
 
     /// <summary>
@@ -119,25 +132,38 @@ public class JobRegistry : IDisposable
         CronHelper.ValidateCronExpression(cronExpression);
 
         var job = new CronJob(cronExpression, action, timeout);
+        JobEventArgs? eventArgs = null;
 
         _lock.EnterWriteLock();
         try
         {
             _jobs.Add(job.Id, job);
             _logger?.LogInformation("Job added: {JobId} {Cron} Timeout: {Timeout}", job.Id, job.CronExpression, timeout);
-            try
+            
+            // Prepare event args if there are subscribers, but don't invoke yet
+            if (JobAdded != null)
             {
-                JobAdded?.Invoke(this, new JobEventArgs(job));
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Unhandled exception in JobAdded event handler for job {JobId}", job.Id);
+                eventArgs = new JobEventArgs(job);
             }
         }
         finally
         {
             _lock.ExitWriteLock();
         }
+
+        // Invoke event outside the lock
+        if (eventArgs != null)
+        {
+            try
+            {
+                JobAdded?.Invoke(this, eventArgs);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Unhandled exception in JobAdded event handler for job {JobId}", job.Id);
+            }
+        }
+
         return job.Id;
     }
 
@@ -168,6 +194,9 @@ public class JobRegistry : IDisposable
     /// <returns>True if the job was found and removed; otherwise, false.</returns>
     public bool RemoveJob(Guid jobId)
     {
+        CronJob? removedJob = null;
+        JobEventArgs? eventArgs = null;
+
         _lock.EnterWriteLock();
         try
         {
@@ -178,22 +207,34 @@ public class JobRegistry : IDisposable
             }
 
             // At this point, job is guaranteed to be non-null because Remove returned true
-            _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, job!.CronExpression);
-            try
+            removedJob = job!;
+            _logger?.LogInformation("Job removed: {JobId} {Cron}", jobId, removedJob.CronExpression);
+            
+            // Prepare event args if there are subscribers, but don't invoke yet
+            if (JobRemoved != null)
             {
-                JobRemoved?.Invoke(this, new JobEventArgs(job!));
+                eventArgs = new JobEventArgs(removedJob);
             }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Unhandled exception in JobRemoved event handler for job {JobId} {Cron}", jobId, job!.CronExpression);
-            }
-
-            return true;
         }
         finally
         {
             _lock.ExitWriteLock();
         }
+
+        // Invoke event outside the lock
+        if (eventArgs != null)
+        {
+            try
+            {
+                JobRemoved?.Invoke(this, eventArgs);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Unhandled exception in JobRemoved event handler for job {JobId} {Cron}", jobId, removedJob!.CronExpression);
+            }
+        }
+
+        return removedJob != null;
     }
 
     /// <summary>
@@ -206,21 +247,41 @@ public class JobRegistry : IDisposable
     {
         CronHelper.ValidateCronExpression(newCronExpression);
 
+        CronJob? updatedJob = null;
+        CronJob? existingJob = null;
+        JobEventArgs? eventArgs = null;
+
         _lock.EnterWriteLock();
         try
         {
-            if (!_jobs.TryGetValue(jobId, out var existingJob))
+            if (!_jobs.TryGetValue(jobId, out var oldJob))
             {
                 return false;
             }
             
-            var updatedJob = existingJob with { CronExpression = newCronExpression };
+            existingJob = oldJob;
+            updatedJob = existingJob with { CronExpression = newCronExpression };
             _jobs[jobId] = updatedJob;
             
             _logger?.LogInformation("Job updated: {JobId} {OldCron} -> {NewCron}", jobId, existingJob.CronExpression, newCronExpression);
+            
+            // Prepare event args if there are subscribers, but don't invoke yet
+            if (JobUpdated != null)
+            {
+                eventArgs = new JobEventArgs(updatedJob, existingJob);
+            }
+        }
+        finally
+        {
+            _lock.ExitWriteLock();
+        }
+
+        // Invoke event outside the lock
+        if (eventArgs != null)
+        {
             try
             {
-                JobUpdated?.Invoke(this, new JobEventArgs(updatedJob, existingJob));
+                JobUpdated?.Invoke(this, eventArgs);
             }
             catch (Exception ex)
             {
@@ -228,16 +289,12 @@ public class JobRegistry : IDisposable
                     ex,
                     "Unhandled exception in JobUpdated event handler for job {JobId} with cron change {OldCron} -> {NewCron}",
                     jobId,
-                    existingJob.CronExpression,
-                    updatedJob.CronExpression);
+                    existingJob!.CronExpression,
+                    updatedJob!.CronExpression);
             }
-            
-            return true;
         }
-        finally
-        {
-            _lock.ExitWriteLock();
-        }
+        
+        return updatedJob != null;
     }
 
     /// <summary>
