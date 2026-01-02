@@ -222,7 +222,7 @@ public class JobRegistry : IDisposable
         }
 
         // Invoke event outside the lock
-        if (eventArgs != null && removedJob != null)
+        if (eventArgs != null)
         {
             try
             {
@@ -230,7 +230,7 @@ public class JobRegistry : IDisposable
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Unhandled exception in JobRemoved event handler for job {JobId} {Cron}", jobId, removedJob.CronExpression);
+                _logger?.LogError(ex, "Unhandled exception in JobRemoved event handler for job {JobId} {Cron}", jobId, removedJob!.CronExpression);
             }
         }
 
@@ -277,7 +277,7 @@ public class JobRegistry : IDisposable
         }
 
         // Invoke event outside the lock
-        if (eventArgs != null && updatedJob != null && existingJob != null)
+        if (eventArgs != null)
         {
             try
             {
@@ -289,8 +289,8 @@ public class JobRegistry : IDisposable
                     ex,
                     "Unhandled exception in JobUpdated event handler for job {JobId} with cron change {OldCron} -> {NewCron}",
                     jobId,
-                    existingJob.CronExpression,
-                    updatedJob.CronExpression);
+                    existingJob!.CronExpression,
+                    updatedJob!.CronExpression);
             }
         }
         

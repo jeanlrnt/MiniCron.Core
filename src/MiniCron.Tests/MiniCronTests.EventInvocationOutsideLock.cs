@@ -17,11 +17,12 @@ public partial class MiniCronTests
         var getJobsCompleted = new TaskCompletionSource<bool>();
 
         // Subscribe to JobAdded with a long-running handler
-        registry.JobAdded += async (_, _) =>
+        registry.JobAdded += (_, _) =>
         {
             eventHandlerStarted.SetResult(true);
             // Simulate a slow event handler (e.g., logging to database)
-            await eventHandlerCanComplete.Task;
+            // Block synchronously until signaled
+            eventHandlerCanComplete.Task.GetAwaiter().GetResult();
         };
 
         // Schedule a job (which will trigger JobAdded event)
@@ -43,7 +44,7 @@ public partial class MiniCronTests
         });
 
         // Wait for GetJobs to complete (should happen quickly)
-        await getJobsCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(getJobsCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5)), getJobsTask);
 
         // Now allow event handler to complete
         eventHandlerCanComplete.SetResult(true);
@@ -64,10 +65,10 @@ public partial class MiniCronTests
         var getJobsCompleted = new TaskCompletionSource<bool>();
 
         // Subscribe to JobRemoved with a long-running handler
-        registry.JobRemoved += async (_, _) =>
+        registry.JobRemoved += (_, _) =>
         {
             eventHandlerStarted.SetResult(true);
-            await eventHandlerCanComplete.Task;
+            eventHandlerCanComplete.Task.GetAwaiter().GetResult();
         };
 
         // Remove the job (which will trigger JobRemoved event)
@@ -88,7 +89,7 @@ public partial class MiniCronTests
         });
 
         // Wait for GetJobs to complete
-        await getJobsCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(getJobsCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5)), getJobsTask);
 
         // Allow event handler to complete
         eventHandlerCanComplete.SetResult(true);
@@ -109,10 +110,10 @@ public partial class MiniCronTests
         var getJobsCompleted = new TaskCompletionSource<bool>();
 
         // Subscribe to JobUpdated with a long-running handler
-        registry.JobUpdated += async (_, _) =>
+        registry.JobUpdated += (_, _) =>
         {
             eventHandlerStarted.SetResult(true);
-            await eventHandlerCanComplete.Task;
+            eventHandlerCanComplete.Task.GetAwaiter().GetResult();
         };
 
         // Update the job schedule (which will trigger JobUpdated event)
@@ -134,7 +135,7 @@ public partial class MiniCronTests
         });
 
         // Wait for GetJobs to complete
-        await getJobsCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.WhenAll(getJobsCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5)), getJobsTask);
 
         // Allow event handler to complete
         eventHandlerCanComplete.SetResult(true);
