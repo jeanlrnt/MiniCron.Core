@@ -13,7 +13,7 @@ public partial class MiniCronTests
     {
         var registry = new JobRegistry();
         var eventHandlerStarted = new TaskCompletionSource<bool>();
-        var eventHandlerCanComplete = new ManualResetEventSlim(false);
+        using var eventHandlerCanComplete = new ManualResetEventSlim(false);
         var getJobsCompleted = new TaskCompletionSource<bool>();
 
         // Subscribe to JobAdded with a long-running handler
@@ -61,7 +61,7 @@ public partial class MiniCronTests
         var jobId = registry.ScheduleJob("* * * * *", () => { });
         
         var eventHandlerStarted = new TaskCompletionSource<bool>();
-        var eventHandlerCanComplete = new ManualResetEventSlim(false);
+        using var eventHandlerCanComplete = new ManualResetEventSlim(false);
         var getJobsCompleted = new TaskCompletionSource<bool>();
 
         // Subscribe to JobRemoved with a long-running handler
@@ -106,7 +106,7 @@ public partial class MiniCronTests
         var jobId = registry.ScheduleJob("* * * * *", () => { });
         
         var eventHandlerStarted = new TaskCompletionSource<bool>();
-        var eventHandlerCanComplete = new ManualResetEventSlim(false);
+        using var eventHandlerCanComplete = new ManualResetEventSlim(false);
         var getJobsCompleted = new TaskCompletionSource<bool>();
 
         // Subscribe to JobUpdated with a long-running handler
