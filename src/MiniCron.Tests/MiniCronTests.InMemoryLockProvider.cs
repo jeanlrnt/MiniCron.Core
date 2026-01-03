@@ -181,7 +181,7 @@ public partial class MiniCronTests
         // Test thread safety when multiple threads try to acquire and release locks
         var provider = new InMemoryJobLockProvider();
         var jobId = Guid.NewGuid();
-        var ttl = TimeSpan.FromMilliseconds(50);
+        var ttl = TimeSpan.FromSeconds(10); // Long TTL to ensure lock doesn't expire while held
         var successCount = 0;
         var concurrentHoldCount = 0;
         var maxConcurrentHoldCount = 0;
